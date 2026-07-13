@@ -46,12 +46,15 @@ pnpm dev
 - API：`http://127.0.0.1:4310`
 - 健康检查：`http://127.0.0.1:4310/health`
 
-在相邻目录启动雪山 Market 后，Agent 创建页和 Market 页会自动读取：
+默认会读取已部署的 [雪山 Market Catalog](https://xiamu-ssr.github.io/snowmountain-market/api/catalog.json)。在相邻目录启动 Market 后，可以把 API 切到本地联调：
 
 ```bash
 cd ../snowmountain-market
 pnpm install
 pnpm dev
+
+cd ../XSEngine
+MARKET_INDEX_URL=http://127.0.0.1:4320/api/catalog.json pnpm dev:api
 ```
 
 Catalog 默认地址：`http://127.0.0.1:4320/api/catalog.json`。

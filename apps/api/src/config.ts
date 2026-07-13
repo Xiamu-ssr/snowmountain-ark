@@ -8,5 +8,5 @@ export const config = {
   dataDir: resolve(process.cwd(), envPath),
   sandboxDriver: process.env.SANDBOX_DRIVER === "docker" ? "docker" : "local",
   sandboxImage: process.env.SANDBOX_IMAGE ?? "alpine:3.20",
-  marketIndexUrl: process.env.MARKET_INDEX_URL ?? "http://127.0.0.1:4320/api/catalog.json"
+  marketIndexUrl: process.env.MARKET_INDEX_URL ?? "https://xiamu-ssr.github.io/snowmountain-market/api/catalog.json"
 } as const;
