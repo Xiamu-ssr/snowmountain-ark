@@ -1,0 +1,133 @@
+import { execFile } from "node:child_process";
+import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { dirname, relative, resolve, sep } from "node:path";
+import { promisify } from "node:util";
+import type { Environment, Session, ToolCall } from "@snowmountain/contracts";
+
+const execFileAsync = promisify(execFile);
+
+export interface SandboxOptions {
+  dataDir: string;
+  driver: "local" | "docker";
+  image: string;
+}
+
+export class Sandbox {
+  constructor(private readonly options: SandboxOptions) {}
+
+  async provision(sessionId: string): Promise<string> {
+    const workspace = resolve(this.options.dataDir, "workspaces", sessionId);
+    await mkdir(workspace, { recursive: true });
+    return workspace;
+  }
+
+  async workspacePath(sessionId: string, requested: string): Promise<string> {
+    const workspace = await this.provision(sessionId);
+    const relativePath = requested === "/workspace"
+      ? ""
+      : requested.startsWith("/workspace/")
+        ? requested.slice("/workspace/".length)
+        : requested;
+    const target = resolve(workspace, relativePath);
+    if (target !== workspace && !target.startsWith(`${workspace}${sep}`)) {
+      throw new Error("Path escapes the session workspace");
+    }
+
+    const existing = existsSync(target) ? target : dirname(target);
+    if (existsSync(existing)) {
+      const resolvedExisting = await realpath(existing);
+      const resolvedWorkspace = await realpath(workspace);
+      if (resolvedExisting !== resolvedWorkspace && !resolvedExisting.startsWith(`${resolvedWorkspace}${sep}`)) {
+        throw new Error("Symlink escapes the session workspace");
+      }
+    }
+    return target;
+  }
+
+  async execute(call: ToolCall, session: Session, environment: Environment): Promise<unknown> {
+    switch (call.name) {
+      case "bash":
+        return this.runCommand(session.id, String(call.input.command ?? ""));
+      case "read": {
+        const filePath = await this.workspacePath(session.id, String(call.input.file_path ?? ""));
+        return { content: await readFile(filePath, "utf8"), file_path: this.publicPath(session.id, filePath) };
+      }
+      case "write": {
+        const filePath = await this.workspacePath(session.id, String(call.input.file_path ?? ""));
+        const content = String(call.input.content ?? "");
+        await mkdir(dirname(filePath), { recursive: true });
+        await writeFile(filePath, content, "utf8");
+        return { bytes_written: Buffer.byteLength(content), file_path: this.publicPath(session.id, filePath) };
+      }
+      case "edit": {
+        const filePath = await this.workspacePath(session.id, String(call.input.file_path ?? ""));
+        const before = String(call.input.old_string ?? "");
+        const after = String(call.input.new_string ?? "");
+        const source = await readFile(filePath, "utf8");
+        if (!source.includes(before)) throw new Error("edit old_string was not found");
+        await writeFile(filePath, source.replace(before, after), "utf8");
+        return { replacements: 1, file_path: this.publicPath(session.id, filePath) };
+      }
+      case "glob":
+        return this.runCommand(session.id, `find . -type f -maxdepth 6 | sort | head -200`);
+      case "grep": {
+        const query = String(call.input.pattern ?? "").replaceAll("'", "'\\''");
+        return this.runCommand(session.id, `grep -RIn -- '${query}' . | head -200`);
+      }
+      case "web_fetch": {
+        const response = await fetch(String(call.input.url), { signal: AbortSignal.timeout(15_000) });
+        const text = await response.text();
+        return { status: response.status, content: text.slice(0, 50_000) };
+      }
+      case "web_search":
+        throw new Error("web_search requires a configured search provider");
+      default:
+        throw new Error(`Unsupported tool: ${String(call.name)}`);
+    }
+  }
+
+  private publicPath(sessionId: string, path: string): string {
+    const workspace = resolve(this.options.dataDir, "workspaces", sessionId);
+    const suffix = relative(workspace, path);
+    return suffix ? `/workspace/${suffix}` : "/workspace";
+  }
+
+  private async runCommand(sessionId: string, command: string): Promise<unknown> {
+    const workspace = await this.provision(sessionId);
+    if (this.options.driver === "docker") {
+      const { stdout, stderr } = await execFileAsync("docker", [
+        "run", "--rm", "--network", "none", "--read-only",
+        "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
+        "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+        "--pids-limit", "128", "--memory", "512m", "--cpus", "1",
+        "-v", `${workspace}:/workspace:rw`, "-w", "/workspace",
+        this.options.image, "sh", "-lc", command
+      ], { timeout: 30_000, maxBuffer: 2_000_000 });
+      return { stdout, stderr, exit_code: 0, driver: "docker" };
+    }
+
+    const { stdout, stderr } = await execFileAsync("/bin/sh", ["-lc", command], {
+      cwd: workspace,
+      timeout: 30_000,
+      maxBuffer: 2_000_000,
+      env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: workspace }
+    });
+    const canonicalWorkspace = await realpath(workspace);
+    const normalizePath = (value: string) => value
+      .replaceAll(canonicalWorkspace, "/workspace")
+      .replaceAll(workspace, "/workspace");
+    return {
+      stdout: normalizePath(stdout),
+      stderr: normalizePath(stderr),
+      exit_code: 0,
+      driver: "local-development"
+    };
+  }
+
+  async inspect(sessionId: string): Promise<{ path: string; exists: boolean; bytes: number }> {
+    const workspace = await this.provision(sessionId);
+    const info = await stat(workspace);
+    return { path: "/workspace", exists: info.isDirectory(), bytes: info.size };
+  }
+}

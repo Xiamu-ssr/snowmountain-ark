@@ -1,0 +1,27 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATA_DIR: /app/data
+      HOST: 0.0.0.0
+      PORT: 4310
+      SANDBOX_DRIVER: local
+      MARKET_INDEX_URL: http://host.docker.internal:4320/api/catalog.json
+      VAULT_MASTER_KEY: ${VAULT_MASTER_KEY:-}
+      MODEL_API_KEY: ${MODEL_API_KEY:-}
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "4310:4310"
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "4311:80"
+    restart: unless-stopped

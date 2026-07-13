@@ -1,0 +1,23 @@
+{
+  "name": "@snowmountain/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsup src/server.ts --format esm --platform node --target node24 --out-dir dist --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --import tsx test/*.test.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.1",
+    "@snowmountain/contracts": "workspace:*",
+    "fastify": "^5.3.3",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.3",
+    "tsup": "^8.5.0"
+  }
+}

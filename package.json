@@ -1,0 +1,20 @@
+{
+  "name": "snowmountain-ark",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @snowmountain/api --filter @snowmountain/web dev",
+    "dev:api": "pnpm --filter @snowmountain/api dev",
+    "dev:web": "pnpm --filter @snowmountain/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @snowmountain/api test",
+    "format:conversation": "node scripts/format-conversation.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.15",
+    "typescript": "^5.8.3"
+  }
+}
