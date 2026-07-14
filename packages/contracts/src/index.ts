@@ -265,6 +265,49 @@ export interface AuthStatus {
   expiresAt?: string | undefined;
 }
 
+export type SpecStatus = "planned" | "partial" | "implemented" | "verified" | "deprecated";
+export type SpecKind = "state-machine" | "capability-policy" | "component" | "data-lifecycle" | "integration";
+
+export interface SpecDocument {
+  dsl: "snowmountain.spec/v1";
+  kind: SpecKind;
+  metadata: { id: string; title: string; status: SpecStatus; owners: string[]; tags: string[] };
+  intent: { summary: string; outcomes: string[]; nonGoals: string[] };
+  knowledge: string[];
+  specRefs?: string[] | undefined;
+  contract: Record<string, unknown>;
+  implementation: { code: string[]; notes: string[] };
+  verification: { tests: string[]; assertions: Array<{ id: string; assertion: string }> };
+  sourcePath: string;
+  source: string;
+}
+
+export interface SpecFeature {
+  id: string;
+  label: string;
+  status: SpecStatus;
+  evidence?: string | undefined;
+  specId: string;
+}
+
+export interface SpecRuntimeFact {
+  id: string;
+  label: string;
+  value: string | number | boolean;
+  source: string;
+}
+
+export interface SpecBundle {
+  format: "snowmountain.spec.bundle/v1";
+  project: { format: "snowmountain.spec.project/v1"; id: string; name: string; description: string; okfRoot: string; contractsRoot: string; repository?: string | undefined };
+  source: string;
+  schema: string;
+  summary: { specs: number; features: number; statuses: Record<SpecStatus, number> };
+  items: SpecDocument[];
+  features: SpecFeature[];
+  runtimeFacts?: SpecRuntimeFact[] | undefined;
+}
+
 export type ManagedResource =
   | Agent
   | Environment

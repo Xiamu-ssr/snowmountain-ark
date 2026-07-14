@@ -1,0 +1,7 @@
+format: snowmountain.spec.project/v1
+id: snowmountain-ark
+name: 雪山方舟
+description: Database-driven Managed Agents control plane
+okfRoot: docs
+contractsRoot: spec/contracts
+repository: https://github.com/Xiamu-ssr/snowmountain-ark

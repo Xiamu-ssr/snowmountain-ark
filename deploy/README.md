@@ -49,6 +49,26 @@ compliant domain; neither should be silently inferred from source code.
 
 The app is built with `VITE_BASE_PATH=/ark/` and `VITE_API_URL=/ark`. The API and Worker have no public host ports.
 
+## Market instance
+
+Ark consumes a separately deployed Snowmountain Market instance. Production
+should set `MARKET_INDEX_URL` to an endpoint reachable from the API container;
+`MARKET_PUBLIC_URL` is the human-facing site opened by the console. They are
+deliberately separate because the server may use an internal mirror while
+humans browse the public GitHub Pages deployment.
+
+On a host that cannot establish outbound TLS to GitHub Pages, build the Market
+repository, serve its `dist/` directory from an independent static container on
+the `snowmountain-ark_default` network, and use:
+
+```env
+MARKET_INDEX_URL=http://snowmountain-market/api/catalog.json
+MARKET_PUBLIC_URL=https://xiamu-ssr.github.io/snowmountain-market/
+```
+
+An unreachable Market is an integration failure, not an indication that the
+Git-first repository or its deployment does not exist.
+
 ## Backup
 
 `backup.sh` uses SQLite's online backup command and retains 14 days by default. Schedule it from the host; never copy only the main database file while WAL writes are active.

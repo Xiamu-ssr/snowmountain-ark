@@ -1,0 +1,42 @@
+dsl: snowmountain.spec/v1
+kind: data-lifecycle
+metadata:
+  id: memory.lifecycle
+  title: Explicit long-term Memory lifecycle
+  status: partial
+  owners: [memory]
+  tags: [memory, session, provenance]
+intent:
+  summary: Long-term Memory is an explicit resource with provenance, not an invisible copy of conversation history.
+  outcomes:
+    - A Session binds zero or more Memory Stores at creation and reads their current entries.
+    - Writes are explicit API/UI operations until an extraction policy is separately specified and reviewable.
+  nonGoals:
+    - Automatically treating model context compaction as durable cross-Session Memory.
+knowledge:
+  - docs/notes/fable5-sdd-dialogue-reading-notes.md
+specRefs: [session.lifecycle]
+contract:
+  entity: memory-store
+  sourceOfTruth: sqlite-resource-memory-store
+  writes:
+    - { actor: authenticated-human-or-api, action: create_update_delete_memory_entry, condition: explicit_write_with_audit }
+  reads:
+    - { actor: bound-session-runtime, action: load_memory_entries, condition: memory_store_id_bound_at_session_creation }
+  extraction:
+    mode: disabled
+    policy: No automatic Session-to-Memory extraction exists; a future extractor requires provenance, confidence, deduplication, privacy and human-control semantics in a new Spec.
+  retention: Explicit entries persist until an authenticated deletion; Session event logs remain a separate source.
+implementation:
+  code:
+    - apps/api/src/app.ts
+    - apps/api/src/harness.ts
+    - apps/web/src/pages/Resources.tsx
+  notes:
+    - Current UI supports explicit Memory CRUD and Session binding.
+verification:
+  tests:
+    - apps/api/test/api.test.ts
+  assertions:
+    - { id: no-implicit-write, assertion: Running a Session interaction does not silently create a Memory entry. }
+    - { id: explicit-binding, assertion: Only Memory Stores named on the Session are included in runtime context. }

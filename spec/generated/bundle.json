@@ -1,0 +1,875 @@
+{
+  "format": "snowmountain.spec.bundle/v1",
+  "project": {
+    "format": "snowmountain.spec.project/v1",
+    "id": "snowmountain-ark",
+    "name": "雪山方舟",
+    "description": "Database-driven Managed Agents control plane",
+    "okfRoot": "docs",
+    "contractsRoot": "spec/contracts",
+    "repository": "https://github.com/Xiamu-ssr/snowmountain-ark"
+  },
+  "source": "spec/contracts/*.yaml",
+  "schema": "spec/schema/snowmountain-spec.schema.json",
+  "summary": {
+    "specs": 6,
+    "features": 13,
+    "statuses": {
+      "planned": 2,
+      "partial": 5,
+      "implemented": 5,
+      "verified": 7,
+      "deprecated": 0
+    }
+  },
+  "items": [
+    {
+      "dsl": "snowmountain.spec/v1",
+      "kind": "component",
+      "metadata": {
+        "id": "agent.runtime",
+        "title": "Agent runtime and model loop",
+        "status": "partial",
+        "owners": [
+          "agent-runtime"
+        ],
+        "tags": [
+          "harness",
+          "model",
+          "tools"
+        ]
+      },
+      "intent": {
+        "summary": "Keep Session, tools and evidence stable while allowing the model/runtime implementation to be replaced.",
+        "outcomes": [
+          "Deterministic tests run without an external LLM.",
+          "OpenAI-compatible endpoints can drive a bounded tool-call loop through the same policy and event surfaces."
+        ],
+        "nonGoals": [
+          "Presenting the current bespoke Harness as feature-equivalent to Claude Agent SDK or OpenCode."
+        ]
+      },
+      "knowledge": [
+        "docs/notes/anthropic-managed-agents.md",
+        "docs/notes/anthropic-auto-mode.md"
+      ],
+      "specRefs": [
+        "session.lifecycle",
+        "sandbox.boundary"
+      ],
+      "contract": {
+        "role": "replaceable-agent-harness",
+        "runtime": "bespoke-simple-harness",
+        "adapters": [
+          {
+            "id": "deterministic-local",
+            "label": "Deterministic local harness with no LLM inference"
+          },
+          {
+            "id": "openai-compatible",
+            "label": "OpenAI-compatible Chat Completions tool loop"
+          }
+        ],
+        "ports": [
+          {
+            "id": "interaction",
+            "direction": "in",
+            "protocol": "durable-interaction-job/v1"
+          },
+          {
+            "id": "model",
+            "direction": "out",
+            "protocol": "openai-chat-completions-compatible"
+          },
+          {
+            "id": "tools",
+            "direction": "out",
+            "protocol": "policy-gated-tool-call/v1"
+          },
+          {
+            "id": "evidence",
+            "direction": "out",
+            "protocol": "append-only-session-events/v1"
+          }
+        ],
+        "features": [
+          {
+            "id": "deterministic-mode",
+            "label": "Deterministic no-LLM acceptance mode",
+            "status": "verified",
+            "evidence": "apps/api/test/api.test.ts"
+          },
+          {
+            "id": "openai-loop",
+            "label": "OpenAI-compatible model/tool loop",
+            "status": "implemented",
+            "evidence": "apps/api/src/harness.ts"
+          },
+          {
+            "id": "sdk-adapter",
+            "label": "Claude Agent SDK or OpenCode runtime adapter",
+            "status": "planned"
+          },
+          {
+            "id": "context-compaction",
+            "label": "Runtime context compaction",
+            "status": "planned"
+          }
+        ],
+        "limitations": [
+          "Production currently has no model credential configured; the deployed acceptance Agent uses deterministic-local.",
+          "The bespoke loop does not yet provide the mature context management, subagent ergonomics and compatibility surface of a full agent SDK."
+        ]
+      },
+      "implementation": {
+        "code": [
+          "apps/api/src/runtime.ts",
+          "apps/api/src/harness.ts",
+          "apps/api/src/mcp.ts",
+          "apps/api/src/policy.ts"
+        ],
+        "notes": [
+          "Runtime adapters must never bypass Policy, Sandbox, Vault proxy or Session events."
+        ]
+      },
+      "verification": {
+        "tests": [
+          "apps/api/test/api.test.ts",
+          "apps/api/test/mcp.test.ts"
+        ],
+        "assertions": [
+          {
+            "id": "stable-evidence",
+            "assertion": "Both deterministic and external-model paths emit the same event contract."
+          },
+          {
+            "id": "replaceable-runtime",
+            "assertion": "Replacing the model adapter does not change Session identity or workspace ownership."
+          }
+        ]
+      },
+      "sourcePath": "spec/contracts/agent-runtime.yaml",
+      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: agent.runtime\n  title: Agent runtime and model loop\n  status: partial\n  owners: [agent-runtime]\n  tags: [harness, model, tools]\nintent:\n  summary: Keep Session, tools and evidence stable while allowing the model/runtime implementation to be replaced.\n  outcomes:\n    - Deterministic tests run without an external LLM.\n    - OpenAI-compatible endpoints can drive a bounded tool-call loop through the same policy and event surfaces.\n  nonGoals:\n    - Presenting the current bespoke Harness as feature-equivalent to Claude Agent SDK or OpenCode.\nknowledge:\n  - docs/notes/anthropic-managed-agents.md\n  - docs/notes/anthropic-auto-mode.md\nspecRefs: [session.lifecycle, sandbox.boundary]\ncontract:\n  role: replaceable-agent-harness\n  runtime: bespoke-simple-harness\n  adapters:\n    - { id: deterministic-local, label: Deterministic local harness with no LLM inference }\n    - { id: openai-compatible, label: OpenAI-compatible Chat Completions tool loop }\n  ports:\n    - { id: interaction, direction: in, protocol: durable-interaction-job/v1 }\n    - { id: model, direction: out, protocol: openai-chat-completions-compatible }\n    - { id: tools, direction: out, protocol: policy-gated-tool-call/v1 }\n    - { id: evidence, direction: out, protocol: append-only-session-events/v1 }\n  features:\n    - { id: deterministic-mode, label: Deterministic no-LLM acceptance mode, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: openai-loop, label: OpenAI-compatible model/tool loop, status: implemented, evidence: apps/api/src/harness.ts }\n    - { id: sdk-adapter, label: Claude Agent SDK or OpenCode runtime adapter, status: planned }\n    - { id: context-compaction, label: Runtime context compaction, status: planned }\n  limitations:\n    - Production currently has no model credential configured; the deployed acceptance Agent uses deterministic-local.\n    - The bespoke loop does not yet provide the mature context management, subagent ergonomics and compatibility surface of a full agent SDK.\nimplementation:\n  code:\n    - apps/api/src/runtime.ts\n    - apps/api/src/harness.ts\n    - apps/api/src/mcp.ts\n    - apps/api/src/policy.ts\n  notes:\n    - Runtime adapters must never bypass Policy, Sandbox, Vault proxy or Session events.\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/api/test/mcp.test.ts\n  assertions:\n    - { id: stable-evidence, assertion: Both deterministic and external-model paths emit the same event contract. }\n    - { id: replaceable-runtime, assertion: Replacing the model adapter does not change Session identity or workspace ownership. }\n"
+    },
+    {
+      "dsl": "snowmountain.spec/v1",
+      "kind": "component",
+      "metadata": {
+        "id": "control-plane.capabilities",
+        "title": "Managed Agents control-plane capability map",
+        "status": "partial",
+        "owners": [
+          "control-plane"
+        ],
+        "tags": [
+          "ui",
+          "api",
+          "parity"
+        ]
+      },
+      "intent": {
+        "summary": "Give humans a compressed, reviewable view of implemented, partial and planned platform capabilities.",
+        "outcomes": [
+          "Progress is derived from structured status and verification links rather than inferred by reading many Markdown files."
+        ],
+        "nonGoals": [
+          "Claiming complete feature parity from the existence of a page or route."
+        ]
+      },
+      "knowledge": [
+        "docs/notes/volcengine-managed-agents-reverse-engineering.md"
+      ],
+      "specRefs": [
+        "session.lifecycle",
+        "sandbox.boundary",
+        "agent.runtime",
+        "memory.lifecycle",
+        "market.integration"
+      ],
+      "contract": {
+        "role": "human-and-api-control-plane",
+        "runtime": "fastify-react-sqlite",
+        "adapters": [],
+        "ports": [
+          {
+            "id": "human-console",
+            "direction": "in",
+            "protocol": "https-react"
+          },
+          {
+            "id": "control-api",
+            "direction": "in",
+            "protocol": "authenticated-rest"
+          },
+          {
+            "id": "data-api",
+            "direction": "in",
+            "protocol": "bearer-rest"
+          }
+        ],
+        "features": [
+          {
+            "id": "agents",
+            "label": "Agents and immutable versions",
+            "status": "verified",
+            "evidence": "apps/api/test/api.test.ts"
+          },
+          {
+            "id": "sessions",
+            "label": "Sessions, queue, approvals and event replay",
+            "status": "verified",
+            "evidence": "apps/api/test/api.test.ts"
+          },
+          {
+            "id": "environments",
+            "label": "Environment packages and variables",
+            "status": "implemented",
+            "evidence": "apps/web/src/pages/Resources.tsx"
+          },
+          {
+            "id": "vault",
+            "label": "Credential Vault and OAuth refresh",
+            "status": "verified",
+            "evidence": "apps/api/test/mcp.test.ts"
+          },
+          {
+            "id": "memory",
+            "label": "Explicit Memory Stores",
+            "status": "partial",
+            "evidence": "spec/contracts/memory-lifecycle.yaml"
+          },
+          {
+            "id": "market",
+            "label": "Git-first Market integration",
+            "status": "implemented",
+            "evidence": "spec/contracts/market-integration.yaml"
+          },
+          {
+            "id": "sandbox",
+            "label": "Replaceable isolated execution backend",
+            "status": "verified",
+            "evidence": "apps/worker/test/worker.test.ts"
+          },
+          {
+            "id": "runtime",
+            "label": "Production-grade agent SDK runtime",
+            "status": "partial",
+            "evidence": "spec/contracts/agent-runtime.yaml"
+          },
+          {
+            "id": "observability",
+            "label": "Audit, events and Prometheus metrics",
+            "status": "implemented",
+            "evidence": "apps/api/src/app.ts"
+          }
+        ],
+        "limitations": [
+          "UI parity does not imply hidden service behavior parity with Volcengine.",
+          "Runtime SDK choice, automatic Memory extraction and stronger-than-runc isolation remain explicit open contracts."
+        ]
+      },
+      "implementation": {
+        "code": [
+          "apps/api/src/app.ts",
+          "apps/web/src/App.tsx"
+        ],
+        "notes": [
+          "The Spec Viewer is a developer projection and is not a Managed Agents business module."
+        ]
+      },
+      "verification": {
+        "tests": [
+          "apps/api/test/api.test.ts",
+          "apps/worker/test/worker.test.ts"
+        ],
+        "assertions": [
+          {
+            "id": "honest-status",
+            "assertion": "Partial capabilities are visibly distinct from implemented and verified capabilities."
+          },
+          {
+            "id": "viewer-separation",
+            "assertion": "The Managed Agents sidebar contains no SDD or project-document content."
+          }
+        ]
+      },
+      "sourcePath": "spec/contracts/control-plane-capabilities.yaml",
+      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: control-plane.capabilities\n  title: Managed Agents control-plane capability map\n  status: partial\n  owners: [control-plane]\n  tags: [ui, api, parity]\nintent:\n  summary: Give humans a compressed, reviewable view of implemented, partial and planned platform capabilities.\n  outcomes:\n    - Progress is derived from structured status and verification links rather than inferred by reading many Markdown files.\n  nonGoals:\n    - Claiming complete feature parity from the existence of a page or route.\nknowledge:\n  - docs/notes/volcengine-managed-agents-reverse-engineering.md\nspecRefs: [session.lifecycle, sandbox.boundary, agent.runtime, memory.lifecycle, market.integration]\ncontract:\n  role: human-and-api-control-plane\n  runtime: fastify-react-sqlite\n  adapters: []\n  ports:\n    - { id: human-console, direction: in, protocol: https-react }\n    - { id: control-api, direction: in, protocol: authenticated-rest }\n    - { id: data-api, direction: in, protocol: bearer-rest }\n  features:\n    - { id: agents, label: Agents and immutable versions, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: sessions, label: \"Sessions, queue, approvals and event replay\", status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: environments, label: Environment packages and variables, status: implemented, evidence: apps/web/src/pages/Resources.tsx }\n    - { id: vault, label: Credential Vault and OAuth refresh, status: verified, evidence: apps/api/test/mcp.test.ts }\n    - { id: memory, label: Explicit Memory Stores, status: partial, evidence: spec/contracts/memory-lifecycle.yaml }\n    - { id: market, label: Git-first Market integration, status: implemented, evidence: spec/contracts/market-integration.yaml }\n    - { id: sandbox, label: Replaceable isolated execution backend, status: verified, evidence: apps/worker/test/worker.test.ts }\n    - { id: runtime, label: Production-grade agent SDK runtime, status: partial, evidence: spec/contracts/agent-runtime.yaml }\n    - { id: observability, label: \"Audit, events and Prometheus metrics\", status: implemented, evidence: apps/api/src/app.ts }\n  limitations:\n    - UI parity does not imply hidden service behavior parity with Volcengine.\n    - Runtime SDK choice, automatic Memory extraction and stronger-than-runc isolation remain explicit open contracts.\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/web/src/App.tsx\n  notes:\n    - The Spec Viewer is a developer projection and is not a Managed Agents business module.\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/worker/test/worker.test.ts\n  assertions:\n    - { id: honest-status, assertion: Partial capabilities are visibly distinct from implemented and verified capabilities. }\n    - { id: viewer-separation, assertion: The Managed Agents sidebar contains no SDD or project-document content. }\n"
+    },
+    {
+      "dsl": "snowmountain.spec/v1",
+      "kind": "integration",
+      "metadata": {
+        "id": "market.integration",
+        "title": "Snowmountain Market catalog integration",
+        "status": "implemented",
+        "owners": [
+          "market",
+          "control-plane"
+        ],
+        "tags": [
+          "market",
+          "git-first",
+          "catalog"
+        ]
+      },
+      "intent": {
+        "summary": "Ark discovers versioned capabilities from a separately deployable Git-first Market instance.",
+        "outcomes": [
+          "Ark consumes a validated catalog endpoint without owning Market source data.",
+          "A local production mirror remains usable when the server cannot reach GitHub Pages."
+        ],
+        "nonGoals": [
+          "Installing capabilities or storing user credentials inside Market."
+        ]
+      },
+      "knowledge": [
+        "docs/notes/google-open-knowledge-format.md"
+      ],
+      "specRefs": [
+        "agent.runtime"
+      ],
+      "contract": {
+        "provider": "snowmountain-market",
+        "sourceOfTruth": "git-repository",
+        "endpoints": [
+          {
+            "id": "catalog",
+            "purpose": "Capability discovery and immutable artifact metadata",
+            "visibility": "internal"
+          },
+          {
+            "id": "public-viewer",
+            "purpose": "Human browsing and installation guidance",
+            "visibility": "public"
+          }
+        ],
+        "health": {
+          "timeoutMs": 5000,
+          "success": "HTTP 2xx with snowmountain-market-catalog/v1 and an items array"
+        },
+        "fallback": "Serve the same Git-built static catalog from an independently deployed local Market container; never synthesize an empty catalog as healthy."
+      },
+      "implementation": {
+        "code": [
+          "apps/api/src/app.ts",
+          "apps/web/src/pages/Market.tsx",
+          "deploy/docker-compose.prod.yml"
+        ],
+        "notes": [
+          "Production uses an internal Market service because the current Alibaba host cannot establish TLS to GitHub Pages."
+        ]
+      },
+      "verification": {
+        "tests": [
+          "apps/api/test/api.test.ts"
+        ],
+        "assertions": [
+          {
+            "id": "catalog-shape",
+            "assertion": "A reachable Market response declares the expected format and returns capability items."
+          },
+          {
+            "id": "visible-failure",
+            "assertion": "An unreachable Market is rendered as unavailable with its endpoint and reason, never as not-yet-started."
+          }
+        ]
+      },
+      "sourcePath": "spec/contracts/market-integration.yaml",
+      "source": "dsl: snowmountain.spec/v1\nkind: integration\nmetadata:\n  id: market.integration\n  title: Snowmountain Market catalog integration\n  status: implemented\n  owners: [market, control-plane]\n  tags: [market, git-first, catalog]\nintent:\n  summary: Ark discovers versioned capabilities from a separately deployable Git-first Market instance.\n  outcomes:\n    - Ark consumes a validated catalog endpoint without owning Market source data.\n    - A local production mirror remains usable when the server cannot reach GitHub Pages.\n  nonGoals:\n    - Installing capabilities or storing user credentials inside Market.\nknowledge:\n  - docs/notes/google-open-knowledge-format.md\nspecRefs: [agent.runtime]\ncontract:\n  provider: snowmountain-market\n  sourceOfTruth: git-repository\n  endpoints:\n    - { id: catalog, purpose: Capability discovery and immutable artifact metadata, visibility: internal }\n    - { id: public-viewer, purpose: Human browsing and installation guidance, visibility: public }\n  health:\n    timeoutMs: 5000\n    success: HTTP 2xx with snowmountain-market-catalog/v1 and an items array\n  fallback: Serve the same Git-built static catalog from an independently deployed local Market container; never synthesize an empty catalog as healthy.\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/web/src/pages/Market.tsx\n    - deploy/docker-compose.prod.yml\n  notes:\n    - Production uses an internal Market service because the current Alibaba host cannot establish TLS to GitHub Pages.\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n  assertions:\n    - { id: catalog-shape, assertion: A reachable Market response declares the expected format and returns capability items. }\n    - { id: visible-failure, assertion: \"An unreachable Market is rendered as unavailable with its endpoint and reason, never as not-yet-started.\" }\n"
+    },
+    {
+      "dsl": "snowmountain.spec/v1",
+      "kind": "data-lifecycle",
+      "metadata": {
+        "id": "memory.lifecycle",
+        "title": "Explicit long-term Memory lifecycle",
+        "status": "partial",
+        "owners": [
+          "memory"
+        ],
+        "tags": [
+          "memory",
+          "session",
+          "provenance"
+        ]
+      },
+      "intent": {
+        "summary": "Long-term Memory is an explicit resource with provenance, not an invisible copy of conversation history.",
+        "outcomes": [
+          "A Session binds zero or more Memory Stores at creation and reads their current entries.",
+          "Writes are explicit API/UI operations until an extraction policy is separately specified and reviewable."
+        ],
+        "nonGoals": [
+          "Automatically treating model context compaction as durable cross-Session Memory."
+        ]
+      },
+      "knowledge": [
+        "docs/notes/fable5-sdd-dialogue-reading-notes.md"
+      ],
+      "specRefs": [
+        "session.lifecycle"
+      ],
+      "contract": {
+        "entity": "memory-store",
+        "sourceOfTruth": "sqlite-resource-memory-store",
+        "writes": [
+          {
+            "actor": "authenticated-human-or-api",
+            "action": "create_update_delete_memory_entry",
+            "condition": "explicit_write_with_audit"
+          }
+        ],
+        "reads": [
+          {
+            "actor": "bound-session-runtime",
+            "action": "load_memory_entries",
+            "condition": "memory_store_id_bound_at_session_creation"
+          }
+        ],
+        "extraction": {
+          "mode": "disabled",
+          "policy": "No automatic Session-to-Memory extraction exists; a future extractor requires provenance, confidence, deduplication, privacy and human-control semantics in a new Spec."
+        },
+        "retention": "Explicit entries persist until an authenticated deletion; Session event logs remain a separate source."
+      },
+      "implementation": {
+        "code": [
+          "apps/api/src/app.ts",
+          "apps/api/src/harness.ts",
+          "apps/web/src/pages/Resources.tsx"
+        ],
+        "notes": [
+          "Current UI supports explicit Memory CRUD and Session binding."
+        ]
+      },
+      "verification": {
+        "tests": [
+          "apps/api/test/api.test.ts"
+        ],
+        "assertions": [
+          {
+            "id": "no-implicit-write",
+            "assertion": "Running a Session interaction does not silently create a Memory entry."
+          },
+          {
+            "id": "explicit-binding",
+            "assertion": "Only Memory Stores named on the Session are included in runtime context."
+          }
+        ]
+      },
+      "sourcePath": "spec/contracts/memory-lifecycle.yaml",
+      "source": "dsl: snowmountain.spec/v1\nkind: data-lifecycle\nmetadata:\n  id: memory.lifecycle\n  title: Explicit long-term Memory lifecycle\n  status: partial\n  owners: [memory]\n  tags: [memory, session, provenance]\nintent:\n  summary: Long-term Memory is an explicit resource with provenance, not an invisible copy of conversation history.\n  outcomes:\n    - A Session binds zero or more Memory Stores at creation and reads their current entries.\n    - Writes are explicit API/UI operations until an extraction policy is separately specified and reviewable.\n  nonGoals:\n    - Automatically treating model context compaction as durable cross-Session Memory.\nknowledge:\n  - docs/notes/fable5-sdd-dialogue-reading-notes.md\nspecRefs: [session.lifecycle]\ncontract:\n  entity: memory-store\n  sourceOfTruth: sqlite-resource-memory-store\n  writes:\n    - { actor: authenticated-human-or-api, action: create_update_delete_memory_entry, condition: explicit_write_with_audit }\n  reads:\n    - { actor: bound-session-runtime, action: load_memory_entries, condition: memory_store_id_bound_at_session_creation }\n  extraction:\n    mode: disabled\n    policy: No automatic Session-to-Memory extraction exists; a future extractor requires provenance, confidence, deduplication, privacy and human-control semantics in a new Spec.\n  retention: Explicit entries persist until an authenticated deletion; Session event logs remain a separate source.\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/api/src/harness.ts\n    - apps/web/src/pages/Resources.tsx\n  notes:\n    - Current UI supports explicit Memory CRUD and Session binding.\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n  assertions:\n    - { id: no-implicit-write, assertion: Running a Session interaction does not silently create a Memory entry. }\n    - { id: explicit-binding, assertion: Only Memory Stores named on the Session are included in runtime context. }\n"
+    },
+    {
+      "dsl": "snowmountain.spec/v1",
+      "kind": "capability-policy",
+      "metadata": {
+        "id": "sandbox.boundary",
+        "title": "Sandbox and credential containment",
+        "status": "verified",
+        "owners": [
+          "runtime-security"
+        ],
+        "tags": [
+          "sandbox",
+          "docker",
+          "containment"
+        ]
+      },
+      "intent": {
+        "summary": "No single execution component may hold both arbitrary code execution and production credentials.",
+        "outcomes": [
+          "Tool code runs with a Session workspace and explicit resource ceilings.",
+          "The Docker-socket-bearing Worker cannot read Vault or model credentials."
+        ],
+        "nonGoals": [
+          "Claiming OCI containers provide a hostile multi-tenant boundary equivalent to a microVM."
+        ]
+      },
+      "knowledge": [
+        "docs/notes/anthropic-containment.md"
+      ],
+      "specRefs": [
+        "session.lifecycle"
+      ],
+      "contract": {
+        "subjects": [
+          {
+            "id": "api",
+            "label": "Credential-bearing control plane"
+          },
+          {
+            "id": "worker",
+            "label": "Sandbox Worker"
+          },
+          {
+            "id": "sandbox",
+            "label": "Ephemeral tool container"
+          }
+        ],
+        "resources": [
+          {
+            "id": "vault-secrets",
+            "label": "Vault and model credentials"
+          },
+          {
+            "id": "docker-socket",
+            "label": "Host Docker socket"
+          },
+          {
+            "id": "session-workspace",
+            "label": "One Session workspace"
+          },
+          {
+            "id": "arbitrary-egress",
+            "label": "Unrestricted network egress"
+          }
+        ],
+        "grants": [
+          {
+            "subject": "api",
+            "resource": "vault-secrets",
+            "access": "read"
+          },
+          {
+            "subject": "api",
+            "resource": "docker-socket",
+            "access": "none"
+          },
+          {
+            "subject": "worker",
+            "resource": "vault-secrets",
+            "access": "none"
+          },
+          {
+            "subject": "worker",
+            "resource": "docker-socket",
+            "access": "admin"
+          },
+          {
+            "subject": "sandbox",
+            "resource": "session-workspace",
+            "access": "write"
+          },
+          {
+            "subject": "sandbox",
+            "resource": "vault-secrets",
+            "access": "none"
+          },
+          {
+            "subject": "sandbox",
+            "resource": "arbitrary-egress",
+            "access": "none"
+          }
+        ],
+        "constraints": [
+          {
+            "id": "split-privilege",
+            "type": "mutually-exclusive",
+            "resources": [
+              "vault-secrets",
+              "docker-socket"
+            ],
+            "assertion": "No subject receives both credential access and Docker socket access."
+          }
+        ]
+      },
+      "implementation": {
+        "code": [
+          "apps/api/src/sandbox.ts",
+          "apps/worker/src/app.ts",
+          "deploy/docker-compose.prod.yml"
+        ],
+        "notes": [
+          "Current isolation tier is Docker/runc with network none, read-only rootfs, dropped capabilities, no-new-privileges, PID/CPU/memory/runtime limits.",
+          "A gVisor or microVM driver remains a replaceable higher-isolation execution backend."
+        ]
+      },
+      "verification": {
+        "tests": [
+          "apps/worker/test/worker.test.ts",
+          "apps/api/test/sandbox.test.ts",
+          "apps/api/test/policy.test.ts"
+        ],
+        "assertions": [
+          {
+            "id": "worker-auth",
+            "assertion": "Unauthenticated Worker requests are rejected."
+          },
+          {
+            "id": "path-containment",
+            "assertion": "Session IDs and workspace paths cannot escape the workspace root."
+          }
+        ]
+      },
+      "sourcePath": "spec/contracts/sandbox-boundary.yaml",
+      "source": "dsl: snowmountain.spec/v1\nkind: capability-policy\nmetadata:\n  id: sandbox.boundary\n  title: Sandbox and credential containment\n  status: verified\n  owners: [runtime-security]\n  tags: [sandbox, docker, containment]\nintent:\n  summary: No single execution component may hold both arbitrary code execution and production credentials.\n  outcomes:\n    - Tool code runs with a Session workspace and explicit resource ceilings.\n    - The Docker-socket-bearing Worker cannot read Vault or model credentials.\n  nonGoals:\n    - Claiming OCI containers provide a hostile multi-tenant boundary equivalent to a microVM.\nknowledge:\n  - docs/notes/anthropic-containment.md\nspecRefs: [session.lifecycle]\ncontract:\n  subjects:\n    - { id: api, label: Credential-bearing control plane }\n    - { id: worker, label: Sandbox Worker }\n    - { id: sandbox, label: Ephemeral tool container }\n  resources:\n    - { id: vault-secrets, label: Vault and model credentials }\n    - { id: docker-socket, label: Host Docker socket }\n    - { id: session-workspace, label: One Session workspace }\n    - { id: arbitrary-egress, label: Unrestricted network egress }\n  grants:\n    - { subject: api, resource: vault-secrets, access: read }\n    - { subject: api, resource: docker-socket, access: none }\n    - { subject: worker, resource: vault-secrets, access: none }\n    - { subject: worker, resource: docker-socket, access: admin }\n    - { subject: sandbox, resource: session-workspace, access: write }\n    - { subject: sandbox, resource: vault-secrets, access: none }\n    - { subject: sandbox, resource: arbitrary-egress, access: none }\n  constraints:\n    - id: split-privilege\n      type: mutually-exclusive\n      resources: [vault-secrets, docker-socket]\n      assertion: No subject receives both credential access and Docker socket access.\nimplementation:\n  code:\n    - apps/api/src/sandbox.ts\n    - apps/worker/src/app.ts\n    - deploy/docker-compose.prod.yml\n  notes:\n    - Current isolation tier is Docker/runc with network none, read-only rootfs, dropped capabilities, no-new-privileges, PID/CPU/memory/runtime limits.\n    - A gVisor or microVM driver remains a replaceable higher-isolation execution backend.\nverification:\n  tests:\n    - apps/worker/test/worker.test.ts\n    - apps/api/test/sandbox.test.ts\n    - apps/api/test/policy.test.ts\n  assertions:\n    - { id: worker-auth, assertion: Unauthenticated Worker requests are rejected. }\n    - { id: path-containment, assertion: Session IDs and workspace paths cannot escape the workspace root. }\n"
+    },
+    {
+      "dsl": "snowmountain.spec/v1",
+      "kind": "state-machine",
+      "metadata": {
+        "id": "session.lifecycle",
+        "title": "Managed Session lifecycle",
+        "status": "verified",
+        "owners": [
+          "control-plane"
+        ],
+        "tags": [
+          "session",
+          "queue",
+          "recovery"
+        ]
+      },
+      "intent": {
+        "summary": "A Session is durable state and evidence, not the lifetime of one model request or sandbox container.",
+        "outcomes": [
+          "Interactions are serialized per Session and queued durably across process restarts.",
+          "Interrupted side effects are never silently replayed after a restart."
+        ],
+        "nonGoals": [
+          "Reconstructing an interrupted model/tool call without an explicit retry."
+        ]
+      },
+      "knowledge": [
+        "docs/notes/anthropic-managed-agents.md",
+        "docs/notes/fable5-sdd-dialogue-reading-notes.md"
+      ],
+      "specRefs": [
+        "sandbox.boundary",
+        "agent.runtime"
+      ],
+      "contract": {
+        "initial": "idle",
+        "states": [
+          {
+            "id": "idle",
+            "label": "Idle"
+          },
+          {
+            "id": "queued",
+            "label": "Queued"
+          },
+          {
+            "id": "running",
+            "label": "Running"
+          },
+          {
+            "id": "waiting_approval",
+            "label": "Waiting for approval"
+          },
+          {
+            "id": "failed",
+            "label": "Failed"
+          },
+          {
+            "id": "stopped",
+            "label": "Stopped",
+            "terminal": true
+          }
+        ],
+        "transitions": [
+          {
+            "from": "idle",
+            "event": "interaction_submitted",
+            "to": "queued",
+            "effect": "persist_job_and_status_event"
+          },
+          {
+            "from": "failed",
+            "event": "explicit_retry",
+            "to": "queued",
+            "effect": "persist_new_job"
+          },
+          {
+            "from": "queued",
+            "event": "worker_claimed",
+            "to": "running",
+            "effect": "append_running_event"
+          },
+          {
+            "from": "queued",
+            "event": "user_stop",
+            "to": "stopped",
+            "effect": "cancel_queued_job"
+          },
+          {
+            "from": "running",
+            "event": "approval_required",
+            "to": "waiting_approval",
+            "effect": "persist_pending_approval"
+          },
+          {
+            "from": "running",
+            "event": "turn_completed",
+            "to": "idle",
+            "effect": "append_end_turn"
+          },
+          {
+            "from": "running",
+            "event": "execution_failed",
+            "to": "failed",
+            "effect": "persist_error"
+          },
+          {
+            "from": "running",
+            "event": "user_stop",
+            "to": "stopped",
+            "effect": "abort_execution"
+          },
+          {
+            "from": "waiting_approval",
+            "event": "approved",
+            "to": "running",
+            "effect": "resume_same_call"
+          },
+          {
+            "from": "waiting_approval",
+            "event": "rejected",
+            "to": "failed",
+            "effect": "persist_denial"
+          },
+          {
+            "from": "waiting_approval",
+            "event": "control_plane_restart",
+            "to": "failed",
+            "effect": "require_explicit_retry"
+          }
+        ],
+        "invariants": [
+          {
+            "id": "one-active-job",
+            "assertion": "At most one interaction executes for the same Session."
+          },
+          {
+            "id": "append-only-evidence",
+            "assertion": "Every state transition is represented by an append-only Session event."
+          },
+          {
+            "id": "no-silent-replay",
+            "assertion": "A job that was running at restart becomes failed and is not replayed automatically."
+          }
+        ]
+      },
+      "implementation": {
+        "code": [
+          "apps/api/src/queue.ts",
+          "apps/api/src/db.ts",
+          "apps/api/src/harness.ts"
+        ],
+        "notes": [
+          "SQLite WAL is the current durable queue and event-store implementation."
+        ]
+      },
+      "verification": {
+        "tests": [
+          "apps/api/test/api.test.ts"
+        ],
+        "assertions": [
+          {
+            "id": "queue-restart",
+            "assertion": "A queued interaction persisted before startup is drained after restart."
+          },
+          {
+            "id": "workspace-restart",
+            "assertion": "A Session reads the same workspace file after the API process is restarted."
+          }
+        ]
+      },
+      "sourcePath": "spec/contracts/session-lifecycle.yaml",
+      "source": "dsl: snowmountain.spec/v1\nkind: state-machine\nmetadata:\n  id: session.lifecycle\n  title: Managed Session lifecycle\n  status: verified\n  owners: [control-plane]\n  tags: [session, queue, recovery]\nintent:\n  summary: A Session is durable state and evidence, not the lifetime of one model request or sandbox container.\n  outcomes:\n    - Interactions are serialized per Session and queued durably across process restarts.\n    - Interrupted side effects are never silently replayed after a restart.\n  nonGoals:\n    - Reconstructing an interrupted model/tool call without an explicit retry.\nknowledge:\n  - docs/notes/anthropic-managed-agents.md\n  - docs/notes/fable5-sdd-dialogue-reading-notes.md\nspecRefs: [sandbox.boundary, agent.runtime]\ncontract:\n  initial: idle\n  states:\n    - { id: idle, label: Idle }\n    - { id: queued, label: Queued }\n    - { id: running, label: Running }\n    - { id: waiting_approval, label: Waiting for approval }\n    - { id: failed, label: Failed }\n    - { id: stopped, label: Stopped, terminal: true }\n  transitions:\n    - { from: idle, event: interaction_submitted, to: queued, effect: persist_job_and_status_event }\n    - { from: failed, event: explicit_retry, to: queued, effect: persist_new_job }\n    - { from: queued, event: worker_claimed, to: running, effect: append_running_event }\n    - { from: queued, event: user_stop, to: stopped, effect: cancel_queued_job }\n    - { from: running, event: approval_required, to: waiting_approval, effect: persist_pending_approval }\n    - { from: running, event: turn_completed, to: idle, effect: append_end_turn }\n    - { from: running, event: execution_failed, to: failed, effect: persist_error }\n    - { from: running, event: user_stop, to: stopped, effect: abort_execution }\n    - { from: waiting_approval, event: approved, to: running, effect: resume_same_call }\n    - { from: waiting_approval, event: rejected, to: failed, effect: persist_denial }\n    - { from: waiting_approval, event: control_plane_restart, to: failed, effect: require_explicit_retry }\n  invariants:\n    - { id: one-active-job, assertion: At most one interaction executes for the same Session. }\n    - { id: append-only-evidence, assertion: Every state transition is represented by an append-only Session event. }\n    - { id: no-silent-replay, assertion: A job that was running at restart becomes failed and is not replayed automatically. }\nimplementation:\n  code:\n    - apps/api/src/queue.ts\n    - apps/api/src/db.ts\n    - apps/api/src/harness.ts\n  notes:\n    - SQLite WAL is the current durable queue and event-store implementation.\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n  assertions:\n    - { id: queue-restart, assertion: A queued interaction persisted before startup is drained after restart. }\n    - { id: workspace-restart, assertion: A Session reads the same workspace file after the API process is restarted. }\n"
+    }
+  ],
+  "features": [
+    {
+      "id": "deterministic-mode",
+      "label": "Deterministic no-LLM acceptance mode",
+      "status": "verified",
+      "evidence": "apps/api/test/api.test.ts",
+      "specId": "agent.runtime"
+    },
+    {
+      "id": "openai-loop",
+      "label": "OpenAI-compatible model/tool loop",
+      "status": "implemented",
+      "evidence": "apps/api/src/harness.ts",
+      "specId": "agent.runtime"
+    },
+    {
+      "id": "sdk-adapter",
+      "label": "Claude Agent SDK or OpenCode runtime adapter",
+      "status": "planned",
+      "specId": "agent.runtime"
+    },
+    {
+      "id": "context-compaction",
+      "label": "Runtime context compaction",
+      "status": "planned",
+      "specId": "agent.runtime"
+    },
+    {
+      "id": "agents",
+      "label": "Agents and immutable versions",
+      "status": "verified",
+      "evidence": "apps/api/test/api.test.ts",
+      "specId": "control-plane.capabilities"
+    },
+    {
+      "id": "sessions",
+      "label": "Sessions, queue, approvals and event replay",
+      "status": "verified",
+      "evidence": "apps/api/test/api.test.ts",
+      "specId": "control-plane.capabilities"
+    },
+    {
+      "id": "environments",
+      "label": "Environment packages and variables",
+      "status": "implemented",
+      "evidence": "apps/web/src/pages/Resources.tsx",
+      "specId": "control-plane.capabilities"
+    },
+    {
+      "id": "vault",
+      "label": "Credential Vault and OAuth refresh",
+      "status": "verified",
+      "evidence": "apps/api/test/mcp.test.ts",
+      "specId": "control-plane.capabilities"
+    },
+    {
+      "id": "memory",
+      "label": "Explicit Memory Stores",
+      "status": "partial",
+      "evidence": "spec/contracts/memory-lifecycle.yaml",
+      "specId": "control-plane.capabilities"
+    },
+    {
+      "id": "market",
+      "label": "Git-first Market integration",
+      "status": "implemented",
+      "evidence": "spec/contracts/market-integration.yaml",
+      "specId": "control-plane.capabilities"
+    },
+    {
+      "id": "sandbox",
+      "label": "Replaceable isolated execution backend",
+      "status": "verified",
+      "evidence": "apps/worker/test/worker.test.ts",
+      "specId": "control-plane.capabilities"
+    },
+    {
+      "id": "runtime",
+      "label": "Production-grade agent SDK runtime",
+      "status": "partial",
+      "evidence": "spec/contracts/agent-runtime.yaml",
+      "specId": "control-plane.capabilities"
+    },
+    {
+      "id": "observability",
+      "label": "Audit, events and Prometheus metrics",
+      "status": "implemented",
+      "evidence": "apps/api/src/app.ts",
+      "specId": "control-plane.capabilities"
+    }
+  ]
+}

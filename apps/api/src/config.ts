@@ -1,6 +1,8 @@
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const envPath = process.env.DATA_DIR ?? "../../data";
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 export const config = {
   host: process.env.HOST ?? "127.0.0.1",
@@ -12,6 +14,10 @@ export const config = {
   sandboxWorkerToken: process.env.SANDBOX_WORKER_TOKEN ?? "",
   sandboxHostDataDir: process.env.SANDBOX_HOST_DATA_DIR,
   marketIndexUrl: process.env.MARKET_INDEX_URL ?? "https://xiamu-ssr.github.io/snowmountain-market/api/catalog.json",
+  marketPublicUrl: process.env.MARKET_PUBLIC_URL ?? "https://xiamu-ssr.github.io/snowmountain-market/",
+  specBundlePath: process.env.SPEC_BUNDLE_PATH
+    ? resolve(process.cwd(), process.env.SPEC_BUNDLE_PATH)
+    : resolve(repositoryRoot, "spec/generated/bundle.json"),
   adminUsername: process.env.ADMIN_USERNAME ?? "admin",
   adminPassword: process.env.ADMIN_PASSWORD ?? "",
   authCookieSecure: process.env.AUTH_COOKIE_SECURE === "true",

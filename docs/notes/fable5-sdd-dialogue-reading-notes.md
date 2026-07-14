@@ -1,8 +1,9 @@
 ---
 type: reading-note
 title: 从对抗基模到设计收敛系统
-description: 对用户与另一 Agent 围绕 Opus 4.6、SDD、精确 DSL、评测和 OKF 长对话的理解、纠偏与工程结论。
+description: 对用户与 Claude Fable 5 围绕 Opus 4.6、SDD、精确 DSL、评测和 OKF 长对话的理解、纠偏与工程结论。
 resource: ../sources/conversations/opus46-sdd-dialogue.md
+interlocutor: "Anthropic: Claude Fable 5 | Google Vertex"
 tags: [sdd, spec, dsl, evaluation, okf, managed-agents]
 timestamp: 2026-07-13T23:58:00+08:00
 ---
@@ -10,6 +11,8 @@ timestamp: 2026-07-13T23:58:00+08:00
 # 从对抗基模到设计收敛系统
 
 原文：[结构化对话全文](../sources/conversations/opus46-sdd-dialogue.md)；[逐字原始粘贴](../sources/conversations/opus46-sdd-dialogue.raw.txt)。
+
+> 归属说明：对话对象是 **Claude Fable 5**；Opus 4.6 是对话的起点和主题，不是对话模型。
 
 ## 我认为这场对话真正完成了什么
 
@@ -41,7 +44,9 @@ timestamp: 2026-07-13T23:58:00+08:00
 - 从截图推测出的“原作者只有这些原语”并没有得到原作者 Schema 或源码验证；
 - YAML 只是宿主语法，真正的 DSL 是字段语义、引用规则、校验器和版本兼容策略。
 
-因此雪山项目不会把这套推测的业务 DSL 当成基础依赖。我们只统一 **Agent Capability Manifest**：Agent、Skill、MCP、Tool、Environment、Credential、Memory 的可执行关系。业务团队将来需要状态机或评测 DSL 时，可以作为 Market 中的 Skill/Tool 接入，而不是写死在平台核心。
+此前“雪山项目只统一 Agent Capability Manifest，不建立项目 DSL”的结论过度保守，也违背了本对话后半段已经收敛的答案。正确边界是：**可执行语义必须进入版本化、可解析、可校验、可生成投影的 Spec DSL；OKF 只承载 why、研究与决策背景；Viewer 只读取数据源生成视图。** Agent Capability Manifest 是 Market 领域的一种 DSL，不是整个项目唯一的契约。
+
+Spec 的意义不是多写一层文档，而是在意图和代码之间建立一个高压缩比、低歧义的可执行语义层：人类审查有限的状态、关系、边界、不变量和验收；Agent 据此生成或修改代码；CI 负责校验引用、完备性和测试覆盖。每个事实只应有一个权威来源，图表、进度页和阅读视图都是投影，不能反向成为第二事实源。
 
 ## Spec 与 Eval 不是先后关系
 

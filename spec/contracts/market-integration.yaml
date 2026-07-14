@@ -1,0 +1,41 @@
+dsl: snowmountain.spec/v1
+kind: integration
+metadata:
+  id: market.integration
+  title: Snowmountain Market catalog integration
+  status: implemented
+  owners: [market, control-plane]
+  tags: [market, git-first, catalog]
+intent:
+  summary: Ark discovers versioned capabilities from a separately deployable Git-first Market instance.
+  outcomes:
+    - Ark consumes a validated catalog endpoint without owning Market source data.
+    - A local production mirror remains usable when the server cannot reach GitHub Pages.
+  nonGoals:
+    - Installing capabilities or storing user credentials inside Market.
+knowledge:
+  - docs/notes/google-open-knowledge-format.md
+specRefs: [agent.runtime]
+contract:
+  provider: snowmountain-market
+  sourceOfTruth: git-repository
+  endpoints:
+    - { id: catalog, purpose: Capability discovery and immutable artifact metadata, visibility: internal }
+    - { id: public-viewer, purpose: Human browsing and installation guidance, visibility: public }
+  health:
+    timeoutMs: 5000
+    success: HTTP 2xx with snowmountain-market-catalog/v1 and an items array
+  fallback: Serve the same Git-built static catalog from an independently deployed local Market container; never synthesize an empty catalog as healthy.
+implementation:
+  code:
+    - apps/api/src/app.ts
+    - apps/web/src/pages/Market.tsx
+    - deploy/docker-compose.prod.yml
+  notes:
+    - Production uses an internal Market service because the current Alibaba host cannot establish TLS to GitHub Pages.
+verification:
+  tests:
+    - apps/api/test/api.test.ts
+  assertions:
+    - { id: catalog-shape, assertion: A reachable Market response declares the expected format and returns capability items. }
+    - { id: visible-failure, assertion: "An unreachable Market is rendered as unavailable with its endpoint and reason, never as not-yet-started." }

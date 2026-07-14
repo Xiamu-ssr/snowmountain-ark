@@ -1,0 +1,53 @@
+dsl: snowmountain.spec/v1
+kind: component
+metadata:
+  id: agent.runtime
+  title: Agent runtime and model loop
+  status: partial
+  owners: [agent-runtime]
+  tags: [harness, model, tools]
+intent:
+  summary: Keep Session, tools and evidence stable while allowing the model/runtime implementation to be replaced.
+  outcomes:
+    - Deterministic tests run without an external LLM.
+    - OpenAI-compatible endpoints can drive a bounded tool-call loop through the same policy and event surfaces.
+  nonGoals:
+    - Presenting the current bespoke Harness as feature-equivalent to Claude Agent SDK or OpenCode.
+knowledge:
+  - docs/notes/anthropic-managed-agents.md
+  - docs/notes/anthropic-auto-mode.md
+specRefs: [session.lifecycle, sandbox.boundary]
+contract:
+  role: replaceable-agent-harness
+  runtime: bespoke-simple-harness
+  adapters:
+    - { id: deterministic-local, label: Deterministic local harness with no LLM inference }
+    - { id: openai-compatible, label: OpenAI-compatible Chat Completions tool loop }
+  ports:
+    - { id: interaction, direction: in, protocol: durable-interaction-job/v1 }
+    - { id: model, direction: out, protocol: openai-chat-completions-compatible }
+    - { id: tools, direction: out, protocol: policy-gated-tool-call/v1 }
+    - { id: evidence, direction: out, protocol: append-only-session-events/v1 }
+  features:
+    - { id: deterministic-mode, label: Deterministic no-LLM acceptance mode, status: verified, evidence: apps/api/test/api.test.ts }
+    - { id: openai-loop, label: OpenAI-compatible model/tool loop, status: implemented, evidence: apps/api/src/harness.ts }
+    - { id: sdk-adapter, label: Claude Agent SDK or OpenCode runtime adapter, status: planned }
+    - { id: context-compaction, label: Runtime context compaction, status: planned }
+  limitations:
+    - Production currently has no model credential configured; the deployed acceptance Agent uses deterministic-local.
+    - The bespoke loop does not yet provide the mature context management, subagent ergonomics and compatibility surface of a full agent SDK.
+implementation:
+  code:
+    - apps/api/src/runtime.ts
+    - apps/api/src/harness.ts
+    - apps/api/src/mcp.ts
+    - apps/api/src/policy.ts
+  notes:
+    - Runtime adapters must never bypass Policy, Sandbox, Vault proxy or Session events.
+verification:
+  tests:
+    - apps/api/test/api.test.ts
+    - apps/api/test/mcp.test.ts
+  assertions:
+    - { id: stable-evidence, assertion: Both deterministic and external-model paths emit the same event contract. }
+    - { id: replaceable-runtime, assertion: Replacing the model adapter does not change Session identity or workspace ownership. }

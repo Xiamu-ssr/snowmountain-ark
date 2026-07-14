@@ -1,0 +1,57 @@
+dsl: snowmountain.spec/v1
+kind: state-machine
+metadata:
+  id: session.lifecycle
+  title: Managed Session lifecycle
+  status: verified
+  owners: [control-plane]
+  tags: [session, queue, recovery]
+intent:
+  summary: A Session is durable state and evidence, not the lifetime of one model request or sandbox container.
+  outcomes:
+    - Interactions are serialized per Session and queued durably across process restarts.
+    - Interrupted side effects are never silently replayed after a restart.
+  nonGoals:
+    - Reconstructing an interrupted model/tool call without an explicit retry.
+knowledge:
+  - docs/notes/anthropic-managed-agents.md
+  - docs/notes/fable5-sdd-dialogue-reading-notes.md
+specRefs: [sandbox.boundary, agent.runtime]
+contract:
+  initial: idle
+  states:
+    - { id: idle, label: Idle }
+    - { id: queued, label: Queued }
+    - { id: running, label: Running }
+    - { id: waiting_approval, label: Waiting for approval }
+    - { id: failed, label: Failed }
+    - { id: stopped, label: Stopped, terminal: true }
+  transitions:
+    - { from: idle, event: interaction_submitted, to: queued, effect: persist_job_and_status_event }
+    - { from: failed, event: explicit_retry, to: queued, effect: persist_new_job }
+    - { from: queued, event: worker_claimed, to: running, effect: append_running_event }
+    - { from: queued, event: user_stop, to: stopped, effect: cancel_queued_job }
+    - { from: running, event: approval_required, to: waiting_approval, effect: persist_pending_approval }
+    - { from: running, event: turn_completed, to: idle, effect: append_end_turn }
+    - { from: running, event: execution_failed, to: failed, effect: persist_error }
+    - { from: running, event: user_stop, to: stopped, effect: abort_execution }
+    - { from: waiting_approval, event: approved, to: running, effect: resume_same_call }
+    - { from: waiting_approval, event: rejected, to: failed, effect: persist_denial }
+    - { from: waiting_approval, event: control_plane_restart, to: failed, effect: require_explicit_retry }
+  invariants:
+    - { id: one-active-job, assertion: At most one interaction executes for the same Session. }
+    - { id: append-only-evidence, assertion: Every state transition is represented by an append-only Session event. }
+    - { id: no-silent-replay, assertion: A job that was running at restart becomes failed and is not replayed automatically. }
+implementation:
+  code:
+    - apps/api/src/queue.ts
+    - apps/api/src/db.ts
+    - apps/api/src/harness.ts
+  notes:
+    - SQLite WAL is the current durable queue and event-store implementation.
+verification:
+  tests:
+    - apps/api/test/api.test.ts
+  assertions:
+    - { id: queue-restart, assertion: A queued interaction persisted before startup is drained after restart. }
+    - { id: workspace-restart, assertion: A Session reads the same workspace file after the API process is restarted. }

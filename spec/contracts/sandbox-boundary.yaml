@@ -1,0 +1,57 @@
+dsl: snowmountain.spec/v1
+kind: capability-policy
+metadata:
+  id: sandbox.boundary
+  title: Sandbox and credential containment
+  status: verified
+  owners: [runtime-security]
+  tags: [sandbox, docker, containment]
+intent:
+  summary: No single execution component may hold both arbitrary code execution and production credentials.
+  outcomes:
+    - Tool code runs with a Session workspace and explicit resource ceilings.
+    - The Docker-socket-bearing Worker cannot read Vault or model credentials.
+  nonGoals:
+    - Claiming OCI containers provide a hostile multi-tenant boundary equivalent to a microVM.
+knowledge:
+  - docs/notes/anthropic-containment.md
+specRefs: [session.lifecycle]
+contract:
+  subjects:
+    - { id: api, label: Credential-bearing control plane }
+    - { id: worker, label: Sandbox Worker }
+    - { id: sandbox, label: Ephemeral tool container }
+  resources:
+    - { id: vault-secrets, label: Vault and model credentials }
+    - { id: docker-socket, label: Host Docker socket }
+    - { id: session-workspace, label: One Session workspace }
+    - { id: arbitrary-egress, label: Unrestricted network egress }
+  grants:
+    - { subject: api, resource: vault-secrets, access: read }
+    - { subject: api, resource: docker-socket, access: none }
+    - { subject: worker, resource: vault-secrets, access: none }
+    - { subject: worker, resource: docker-socket, access: admin }
+    - { subject: sandbox, resource: session-workspace, access: write }
+    - { subject: sandbox, resource: vault-secrets, access: none }
+    - { subject: sandbox, resource: arbitrary-egress, access: none }
+  constraints:
+    - id: split-privilege
+      type: mutually-exclusive
+      resources: [vault-secrets, docker-socket]
+      assertion: No subject receives both credential access and Docker socket access.
+implementation:
+  code:
+    - apps/api/src/sandbox.ts
+    - apps/worker/src/app.ts
+    - deploy/docker-compose.prod.yml
+  notes:
+    - Current isolation tier is Docker/runc with network none, read-only rootfs, dropped capabilities, no-new-privileges, PID/CPU/memory/runtime limits.
+    - A gVisor or microVM driver remains a replaceable higher-isolation execution backend.
+verification:
+  tests:
+    - apps/worker/test/worker.test.ts
+    - apps/api/test/sandbox.test.ts
+    - apps/api/test/policy.test.ts
+  assertions:
+    - { id: worker-auth, assertion: Unauthenticated Worker requests are rejected. }
+    - { id: path-containment, assertion: Session IDs and workspace paths cannot escape the workspace root. }

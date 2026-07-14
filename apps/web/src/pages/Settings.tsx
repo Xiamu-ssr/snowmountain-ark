@@ -35,6 +35,8 @@ export function SettingsPage() {
     <div className="settings-grid">
       <section className="panel detail-panel"><h3><ServerCog size={17} />运行时</h3><dl className="kv-list">
         <div><dt>Sandbox driver</dt><dd>{String(settings.sandboxDriver ?? "-")}</dd></div>
+        <div><dt>Agent runtime</dt><dd>{String(settings.agentRuntime ?? "-")}</dd></div>
+        <div><dt>Memory extraction</dt><dd>{String(settings.memoryExtraction ?? "-")}</dd></div>
         <div><dt>Sandbox image</dt><dd>{String(settings.sandboxImage ?? "-")}</dd></div>
         <div><dt>Event store</dt><dd>{String(settings.eventStore ?? "-")}</dd></div>
         <div><dt>Node runtime</dt><dd>{String(settings.runtime ?? "-")}</dd></div>
@@ -42,7 +44,7 @@ export function SettingsPage() {
       <section className="panel detail-panel"><h3><ShieldCheck size={17} />安全配置</h3><div className="security-checks">
         <span className={settings.vaultMasterKeyConfigured ? "ok" : "warn"}><CheckCircle2 size={16} />Vault master key {settings.vaultMasterKeyConfigured ? "已配置" : "使用开发默认值"}</span>
         <span className={settings.modelCredentialConfigured ? "ok" : "neutral"}><CheckCircle2 size={16} />模型凭证 {settings.modelCredentialConfigured ? "已配置" : "尚未配置"}</span>
-        <small>Market: {String(settings.marketIndexUrl ?? "-")}</small>
+        <small>Market internal: {String(settings.marketIndexUrl ?? "-")}</small><small>Market public: {String(settings.marketPublicUrl ?? "-")}</small>
       </div></section>
     </div>
     <section className="panel settings-keys"><header><div><h3>API Keys</h3><p>用于把 Managed Session 作为中台 API 调用。Secret 只在创建后显示一次。</p></div></header>

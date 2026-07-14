@@ -12,6 +12,7 @@ import { createId } from "./ids.js";
 import { McpProxy, type ExposedMcpTool } from "./mcp.js";
 import { decidePolicy } from "./policy.js";
 import { Sandbox } from "./sandbox.js";
+import type { AgentRuntime } from "./runtime.js";
 
 interface TextPayload {
   content: string;
@@ -61,7 +62,7 @@ const toolDefinitions = [
   { name: "web_search", description: "Search using the configured provider", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }
 ].map((item) => ({ type: "function", function: item }));
 
-export class Harness {
+export class Harness implements AgentRuntime {
   private readonly approvals = new Map<string, ApprovalWaiter>();
   private readonly controllers = new Map<string, AbortController>();
   private readonly mcp: McpProxy;

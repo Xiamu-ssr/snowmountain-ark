@@ -1,17 +1,18 @@
-import type { AuditEvent, AuthStatus, ManagedResource, MarketEntry, MonitoringSummary, SessionEvent } from "@snowmountain/contracts";
+import type { AuditEvent, AuthStatus, ManagedResource, MarketEntry, MonitoringSummary, SessionEvent, SpecBundle } from "@snowmountain/contracts";
 
 const configured = import.meta.env.VITE_API_URL as string | undefined;
 const API_BASE = configured?.replace(/\/$/, "") ?? "";
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method ?? "GET").toUpperCase();
+  const hasBody = init?.body !== undefined && init.body !== null;
   const csrfCookie = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith("sm_ark_csrf="));
   const csrfToken = csrfCookie ? decodeURIComponent(csrfCookie.slice("sm_ark_csrf=".length)) : "";
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     credentials: "same-origin",
     headers: {
-      "content-type": "application/json",
+      ...(hasBody ? { "content-type": "application/json" } : {}),
       ...(!["GET", "HEAD", "OPTIONS"].includes(method) && csrfToken ? { "x-csrf-token": csrfToken } : {}),
       ...init?.headers
     }
@@ -88,13 +89,13 @@ export const api = {
   settings(): Promise<Record<string, unknown>> {
     return request("/v1/settings");
   },
-  specs(): Promise<{ items: Array<Record<string, unknown>> }> {
+  specs(): Promise<SpecBundle> {
     return request("/v1/specs");
   },
   eventStreamUrl(sessionId: string, after = 0): string {
     return `${API_BASE}/v1/sessions/${sessionId}/events/stream?after=${after}`;
   },
-  market(): Promise<{ items: MarketEntry[]; offline?: boolean; source?: string }> {
+  market(): Promise<{ items: MarketEntry[]; offline?: boolean; source?: string; endpoint?: string; reason?: string }> {
     return request("/v1/market/catalog");
   },
   dependencies(): Promise<{ edges: Array<{ source: string; target: string; relation: string }> }> {

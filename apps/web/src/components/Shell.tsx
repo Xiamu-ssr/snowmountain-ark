@@ -1,8 +1,8 @@
 import {
-  Bot, BookOpenCheck, Box, Brain, ChevronDown, CircleHelp, Fingerprint, GitFork,
-  KeyRound, Layers3, Library, MountainSnow, Search, Settings, Store, Workflow
+  Bot, Box, Brain, ChevronDown, CircleHelp, FileCode2, Fingerprint, GitFork,
+  KeyRound, Layers3, MountainSnow, Search, Settings, Store, Workflow
 } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { api } from "../api";
 
 const nav = [
@@ -11,7 +11,6 @@ const nav = [
   { to: "/environments", label: "Environments", icon: Box },
   { to: "/vaults", label: "Credentials Vault", icon: KeyRound },
   { to: "/memory", label: "Memory", icon: Brain },
-  { to: "/sdd", label: "SDD", icon: BookOpenCheck },
   { to: "/market", label: "雪山 Market", icon: Store },
   { to: "/dependencies", label: "Dependencies", icon: GitFork },
   { to: "/settings", label: "系统设置", icon: Settings }
@@ -30,7 +29,7 @@ export function Shell() {
         </div>
         <div className="global-search"><Search size={16} /><input aria-label="全局搜索" placeholder="搜索 Agent、Session 或文档" /></div>
         <div className="top-actions">
-          <button className="icon-button" aria-label="知识库"><Library size={18} /></button>
+          <Link className="icon-button" to="/specs" aria-label="Spec Viewer" title="开发者 Spec Viewer"><FileCode2 size={18} /></Link>
           <button className="icon-button" aria-label="帮助"><CircleHelp size={18} /></button>
           <button className="account" onClick={() => void logout()} title="退出登录"><Fingerprint size={17} /><span>管理账号</span><ChevronDown size={14} /></button>
         </div>

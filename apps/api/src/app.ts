@@ -16,6 +16,7 @@ import type {
   MonitoringSummary,
   ResourceKind,
   Session,
+  SpecBundle,
   Vault
 } from "@snowmountain/contracts";
 import { defaultToolPolicies } from "@snowmountain/contracts";
@@ -27,6 +28,7 @@ import { createId } from "./ids.js";
 import { fetchClientCredentialsToken } from "./mcp.js";
 import { InteractionQueue } from "./queue.js";
 import { Sandbox } from "./sandbox.js";
+import { loadSpecBundle } from "./specs.js";
 import { sealSecret } from "./vault.js";
 
 export interface AppOptions {
@@ -198,6 +200,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   };
   await app.register(cors, { origin: authOptions.password ? false : true, credentials: true });
   const store = new Store(options.databasePath ?? resolve(config.dataDir, "snowmountain.db"));
+  const specBundle = loadSpecBundle(config.specBundlePath);
   if (options.seed ?? true) seedStore(store);
   store.recoverInterruptedSessions();
   const sandbox = new Sandbox({
@@ -714,6 +717,9 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     sandboxImage: config.sandboxImage,
     sandboxWorker: config.sandboxDriver === "remote" ? config.sandboxWorkerUrl : undefined,
     marketIndexUrl: config.marketIndexUrl,
+    marketPublicUrl: config.marketPublicUrl,
+    agentRuntime: "bespoke-simple-harness",
+    memoryExtraction: "disabled-explicit-writes-only",
     modelCredentialConfigured: Boolean(process.env.MODEL_API_KEY),
     vaultMasterKeyConfigured: Boolean(process.env.VAULT_MASTER_KEY),
     apiKeyCount: store.count("api-key"),
@@ -721,23 +727,30 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     runtime: process.version
   }));
 
-  app.get("/v1/specs", async () => ({ items: [
-    { id: "managed-agents", title: "Managed Agents architecture", type: "architecture", status: "implemented", path: "docs/notes/anthropic-managed-agents.md" },
-    { id: "auto-mode", title: "Approval and Auto Mode policy", type: "security", status: "implemented", path: "docs/notes/anthropic-auto-mode.md" },
-    { id: "containment", title: "Sandbox and credential containment", type: "security", status: "implemented", path: "docs/notes/anthropic-containment.md" },
-    { id: "volcengine-parity", title: "Volcengine Managed Agents parity map", type: "acceptance", status: "in-progress", path: "docs/notes/volcengine-managed-agents-reverse-engineering.md" },
-    { id: "sdd-dialogue", title: "SDD / DSL design dialogue", type: "product-thinking", status: "reference", path: "docs/notes/opus46-sdd-dialogue-reading-notes.md" }
-  ] }));
+  app.get("/v1/specs", async (): Promise<SpecBundle> => ({
+    ...specBundle,
+    runtimeFacts: [
+      { id: "runtime.harness", label: "Agent runtime", value: "bespoke-simple-harness", source: "process-config" },
+      { id: "runtime.model", label: "Production model credential", value: Boolean(process.env.MODEL_API_KEY), source: "process-config" },
+      { id: "runtime.sandbox", label: "Sandbox driver", value: config.sandboxDriver, source: "process-config" },
+      { id: "runtime.memory-extraction", label: "Automatic Memory extraction", value: false, source: "memory.lifecycle" },
+      { id: "runtime.resources", label: "Managed resources", value: store.count(), source: "sqlite" },
+      { id: "runtime.market", label: "Market endpoint", value: config.marketPublicUrl, source: "process-config" }
+    ]
+  }));
 
   app.get("/v1/dependencies", async () => ({ edges: dependencyEdges(store) }));
 
   app.get("/v1/market/catalog", async () => {
     try {
-      const response = await fetch(config.marketIndexUrl, { signal: AbortSignal.timeout(3_000) });
+      const response = await fetch(config.marketIndexUrl, { signal: AbortSignal.timeout(5_000) });
       if (!response.ok) throw new Error(`Market returned ${response.status}`);
-      return await response.json() as { items: MarketEntry[] };
-    } catch {
-      return { items: [] as MarketEntry[], offline: true, source: config.marketIndexUrl };
+      const payload = await response.json() as { format?: string; items?: MarketEntry[] };
+      if (payload.format !== "snowmountain-market-catalog/v1" || !Array.isArray(payload.items)) throw new Error("Market returned an invalid catalog");
+      return { ...payload, source: config.marketPublicUrl, endpoint: config.marketIndexUrl, offline: false };
+    } catch (error) {
+      app.log.warn({ error }, "Market catalog unavailable");
+      return { items: [] as MarketEntry[], offline: true, source: config.marketPublicUrl, endpoint: config.marketIndexUrl, reason: "market_unreachable" };
     }
   });
 

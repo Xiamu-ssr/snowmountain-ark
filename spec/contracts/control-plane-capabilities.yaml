@@ -1,0 +1,51 @@
+dsl: snowmountain.spec/v1
+kind: component
+metadata:
+  id: control-plane.capabilities
+  title: Managed Agents control-plane capability map
+  status: partial
+  owners: [control-plane]
+  tags: [ui, api, parity]
+intent:
+  summary: Give humans a compressed, reviewable view of implemented, partial and planned platform capabilities.
+  outcomes:
+    - Progress is derived from structured status and verification links rather than inferred by reading many Markdown files.
+  nonGoals:
+    - Claiming complete feature parity from the existence of a page or route.
+knowledge:
+  - docs/notes/volcengine-managed-agents-reverse-engineering.md
+specRefs: [session.lifecycle, sandbox.boundary, agent.runtime, memory.lifecycle, market.integration]
+contract:
+  role: human-and-api-control-plane
+  runtime: fastify-react-sqlite
+  adapters: []
+  ports:
+    - { id: human-console, direction: in, protocol: https-react }
+    - { id: control-api, direction: in, protocol: authenticated-rest }
+    - { id: data-api, direction: in, protocol: bearer-rest }
+  features:
+    - { id: agents, label: Agents and immutable versions, status: verified, evidence: apps/api/test/api.test.ts }
+    - { id: sessions, label: "Sessions, queue, approvals and event replay", status: verified, evidence: apps/api/test/api.test.ts }
+    - { id: environments, label: Environment packages and variables, status: implemented, evidence: apps/web/src/pages/Resources.tsx }
+    - { id: vault, label: Credential Vault and OAuth refresh, status: verified, evidence: apps/api/test/mcp.test.ts }
+    - { id: memory, label: Explicit Memory Stores, status: partial, evidence: spec/contracts/memory-lifecycle.yaml }
+    - { id: market, label: Git-first Market integration, status: implemented, evidence: spec/contracts/market-integration.yaml }
+    - { id: sandbox, label: Replaceable isolated execution backend, status: verified, evidence: apps/worker/test/worker.test.ts }
+    - { id: runtime, label: Production-grade agent SDK runtime, status: partial, evidence: spec/contracts/agent-runtime.yaml }
+    - { id: observability, label: "Audit, events and Prometheus metrics", status: implemented, evidence: apps/api/src/app.ts }
+  limitations:
+    - UI parity does not imply hidden service behavior parity with Volcengine.
+    - Runtime SDK choice, automatic Memory extraction and stronger-than-runc isolation remain explicit open contracts.
+implementation:
+  code:
+    - apps/api/src/app.ts
+    - apps/web/src/App.tsx
+  notes:
+    - The Spec Viewer is a developer projection and is not a Managed Agents business module.
+verification:
+  tests:
+    - apps/api/test/api.test.ts
+    - apps/worker/test/worker.test.ts
+  assertions:
+    - { id: honest-status, assertion: Partial capabilities are visibly distinct from implemented and verified capabilities. }
+    - { id: viewer-separation, assertion: The Managed Agents sidebar contains no SDD or project-document content. }

@@ -1,6 +1,6 @@
 import {
   Activity, Bot, Box, Braces, Check, ChevronRight, Clock3, Code2, CornerDownLeft,
-  Cpu, KeyRound, MessageSquareText, Pause, Play, Plus, Radio, Send, Square,
+  KeyRound, MessageSquareText, Pause, Play, Plus, Radio, Send, Square,
   TerminalSquare, Trash2, X, Zap
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,7 +19,7 @@ export function SessionsPage() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(searchParams.get("create") === "1");
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", agentId: searchParams.get("agentId") ?? "", environmentId: "", memoryStoreIds: [] as string[], cpu: 1, memoryMiB: 512, maxRuntimeSeconds: 3600, networkMode: "deny" as "deny" | "allowlist" });
+  const [form, setForm] = useState({ name: "", agentId: searchParams.get("agentId") ?? "", environmentId: "", memoryStoreIds: [] as string[] });
   const load = useCallback(() => Promise.all([
     api.list<Session>("sessions"), api.list<Agent>("agents"), api.list<Environment>("environments"), api.list<MemoryStore>("memory-stores")
   ]).then(([sessionResult, agentResult, environmentResult, memoryResult]) => {
@@ -35,8 +35,7 @@ export function SessionsPage() {
       const session = await api.create<Session>("sessions", {
         name: form.name || `${nameOf(agents, form.agentId)} · ${new Date().toLocaleString()}`,
         description: "Created from the Snowmountain control plane",
-        agentId: form.agentId, environmentId: form.environmentId, memoryStoreIds: form.memoryStoreIds,
-        resourceConfig: { cpu: form.cpu, memoryMiB: form.memoryMiB, maxRuntimeSeconds: form.maxRuntimeSeconds, networkMode: form.networkMode }
+        agentId: form.agentId, environmentId: form.environmentId, memoryStoreIds: form.memoryStoreIds
       });
       setOpen(false); navigate(`/sessions/${session.id}`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
@@ -57,7 +56,7 @@ export function SessionsPage() {
       <label>Agent <span>必填；创建时固定版本</span><select value={form.agentId} onChange={(event) => setForm({ ...form, agentId: event.target.value })}>{agents.map((agent) => <option value={agent.id} key={agent.id}>{agent.name} · V{agent.version}</option>)}</select></label>
       <label>Environment <span>必填</span><select value={form.environmentId} onChange={(event) => setForm({ ...form, environmentId: event.target.value })}>{environments.map((environment) => <option value={environment.id} key={environment.id}>{environment.name}</option>)}</select></label>
       <fieldset className="memory-selector"><legend>Memory Stores <span>可多选</span></legend>{memories.map((memory) => <label key={memory.id}><input type="checkbox" checked={form.memoryStoreIds.includes(memory.id)} onChange={(event) => setForm({ ...form, memoryStoreIds: event.target.checked ? [...form.memoryStoreIds, memory.id] : form.memoryStoreIds.filter((id) => id !== memory.id) })} />{memory.name}<small>{memory.memories.length} memories</small></label>)}</fieldset>
-      <div className="resource-config"><div className="resource-preview"><Cpu size={18} /><div><strong>资源配置</strong><p>Sandbox 资源上限；网络仍通过代理 allowlist，不开放容器任意出口。</p></div></div><div className="form-grid two"><label>CPU<input type="number" min="0.25" max="16" step="0.25" value={form.cpu} onChange={(event) => setForm({ ...form, cpu: Number(event.target.value) })} /></label><label>内存 MiB<input type="number" min="128" max="65536" value={form.memoryMiB} onChange={(event) => setForm({ ...form, memoryMiB: Number(event.target.value) })} /></label><label>最长运行秒数<input type="number" min="60" max="86400" value={form.maxRuntimeSeconds} onChange={(event) => setForm({ ...form, maxRuntimeSeconds: Number(event.target.value) })} /></label><label>网络模式<select value={form.networkMode} onChange={(event) => setForm({ ...form, networkMode: event.target.value as typeof form.networkMode })}><option value="deny">默认拒绝</option><option value="allowlist">Environment allowlist</option></select></label></div></div>
+      <div className="security-note"><Box size={18} /><div><strong>计算资源由平台托管</strong><p>Session 只选择 Agent、Environment 和 Memory；CPU、内存、超时与网络边界由 Sandbox Policy/API 默认值实施。</p></div></div>
     </Modal>
   </div>;
 }

@@ -26,7 +26,7 @@ export function EnvironmentsPage() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", description: "", packages: "git, nodejs, ripgrep", variables: "", allowlist: "", filesystemMode: "read-write-no-delete" as Environment["filesystemMode"] });
+  const [form, setForm] = useState({ name: "", description: "", packages: "git, nodejs, ripgrep", variables: "" });
   const load = useCallback(() => api.list<Environment>("environments").then((result) => setItems(result.items)).catch((reason: Error) => setError(reason.message)), []);
   useEffect(() => { void load(); }, [load]);
   const create = async () => {
@@ -34,27 +34,25 @@ export function EnvironmentsPage() {
       await api.create("environments", {
         name: form.name, description: form.description,
         packages: form.packages.split(",").map((item) => item.trim()).filter(Boolean),
-        variables: parseVariables(form.variables),
-        networkAllowlist: form.allowlist.split(",").map((item) => item.trim()).filter(Boolean),
-        filesystemMode: form.filesystemMode
+        variables: parseVariables(form.variables)
       });
       setOpen(false); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
   };
   const filtered = items.filter((item) => `${item.name} ${item.id}`.toLowerCase().includes(search.toLowerCase()));
   return <div className="page">
-    <PageHeader title="Environments" description="定义 Agent 的运行环境模板，预置依赖、环境变量和可审计的执行边界。" action={<button className="button primary" onClick={() => setOpen(true)}><Plus size={16} />创建 Environment</button>} />
+    <PageHeader title="Environments" description="定义 Agent 的运行环境模板，预置依赖和环境变量；隔离策略由平台统一托管。" action={<button className="button primary" onClick={() => setOpen(true)}><Plus size={16} />创建 Environment</button>} />
     {error && <ErrorBanner error={error} />}
-    <section className="panel"><Toolbar search={search} onSearch={setSearch} />{filtered.length ? <div className="table-wrap"><table><thead><tr><th>名称 / ID</th><th>关联配置</th><th>文件系统</th><th>网络能力</th><th>创建时间</th><th /></tr></thead><tbody>{filtered.map((item) => <tr key={item.id}>
+    <section className="panel"><Toolbar search={search} onSearch={setSearch} />{filtered.length ? <div className="table-wrap"><table><thead><tr><th>名称 / ID</th><th>预装包</th><th>环境变量</th><th>执行边界</th><th>创建时间</th><th /></tr></thead><tbody>{filtered.map((item) => <tr key={item.id}>
       <td><Link className="resource-link" to={`/environments/${item.id}`}><span className="resource-icon blue"><Box size={16} /></span><span><strong>{item.name}</strong><small>{item.id}</small></span></Link></td>
-      <td>{item.packages.length} packages · {item.variables.length} vars</td><td>{item.filesystemMode}</td><td>{item.networkAllowlist.length ? item.networkAllowlist.join(", ") : <span className="safe-text"><Shield size={14} />默认拒绝</span>}</td><td className="muted">{new Date(item.createdAt).toLocaleString()}</td><td><Link className="icon-button" to={`/environments/${item.id}`}><ChevronRight size={17} /></Link></td>
+      <td>{item.packages.length} packages</td><td>{item.variables.length} vars</td><td><span className="safe-text"><Shield size={14} />平台托管</span></td><td className="muted">{new Date(item.createdAt).toLocaleString()}</td><td><Link className="icon-button" to={`/environments/${item.id}`}><ChevronRight size={17} /></Link></td>
     </tr>)}</tbody></table></div> : <EmptyState title="暂无 Environment" description="创建可复用的包、变量与能力边界模板。" />}</section>
     <EnvironmentModal open={open} form={form} setForm={setForm} onClose={() => setOpen(false)} onSave={() => void create()} title="创建 Environment" />
   </div>;
 }
 
 function EnvironmentModal({ open, form, setForm, onClose, onSave, title }: {
-  open: boolean; form: { name: string; description: string; packages: string; variables: string; allowlist: string; filesystemMode: Environment["filesystemMode"] };
+  open: boolean; form: { name: string; description: string; packages: string; variables: string };
   setForm(value: typeof form): void; onClose(): void; onSave(): void; title: string;
 }) {
   return <Modal title={title} open={open} onClose={onClose} footer={<><button className="button secondary" onClick={onClose}>取消</button><button className="button primary" disabled={!form.name} onClick={onSave}>保存</button></>}>
@@ -62,8 +60,7 @@ function EnvironmentModal({ open, form, setForm, onClose, onSave, title }: {
     <label>描述<textarea rows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
     <label>预装包 <span>逗号分隔；实际镜像必须已包含这些包</span><input value={form.packages} onChange={(event) => setForm({ ...form, packages: event.target.value })} /></label>
     <label>环境变量 <span>每行 KEY=value，秘密变量前加 SECRET:</span><textarea className="code-textarea" rows={5} value={form.variables} onChange={(event) => setForm({ ...form, variables: event.target.value })} placeholder={"NODE_ENV=production\nSECRET:SERVICE_TOKEN=..."} /></label>
-    <div className="form-grid two"><label>文件系统<select value={form.filesystemMode} onChange={(event) => setForm({ ...form, filesystemMode: event.target.value as Environment["filesystemMode"] })}><option value="read-write-no-delete">读写（禁止越界）</option><option value="read-write">读写</option><option value="read-only">只读</option></select></label><label>网络域名能力 <span>默认不联网</span><input value={form.allowlist} onChange={(event) => setForm({ ...form, allowlist: event.target.value })} placeholder="api.example.com, github.com" /></label></div>
-    <div className="security-note"><LockKeyhole size={18} /><div><strong>Environment 不等于 Credential Vault</strong><p>长期凭证应存放在 Vault；环境变量只用于运行配置和必须显式声明的秘密。</p></div></div>
+    <div className="security-note"><LockKeyhole size={18} /><div><strong>权限不是 Environment 的人类配置项</strong><p>文件系统、网络和资源上限由 Sandbox/Policy 统一实施；长期凭证必须放进 Vault。</p></div></div>
   </Modal>;
 }
 
@@ -73,18 +70,18 @@ export function EnvironmentDetailPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", description: "", packages: "", variables: "", allowlist: "", filesystemMode: "read-write-no-delete" as Environment["filesystemMode"] });
+  const [form, setForm] = useState({ name: "", description: "", packages: "", variables: "" });
   const load = useCallback(() => Promise.all([api.get<Environment>("environments", id), api.list<Session>("sessions")]).then(([environment, result]) => {
     setItem(environment); setSessions(result.items.filter((session) => session.environmentId === id));
-    setForm({ name: environment.name, description: environment.description, packages: environment.packages.join(", "), variables: serializeVariables(environment.variables), allowlist: environment.networkAllowlist.join(", "), filesystemMode: environment.filesystemMode });
+    setForm({ name: environment.name, description: environment.description, packages: environment.packages.join(", "), variables: serializeVariables(environment.variables) });
   }).catch((reason: Error) => setError(reason.message)), [id]);
   useEffect(() => { void load(); }, [load]);
   if (error && !item) return <div className="page"><ErrorBanner error={error} /></div>;
   if (!item) return <Loading />;
-  const save = async () => { try { await api.patch("environments", id, { name: form.name, description: form.description, packages: form.packages.split(",").map((value) => value.trim()).filter(Boolean), variables: parseVariables(form.variables), networkAllowlist: form.allowlist.split(",").map((value) => value.trim()).filter(Boolean), filesystemMode: form.filesystemMode }); setOpen(false); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); } };
+  const save = async () => { try { await api.patch("environments", id, { name: form.name, description: form.description, packages: form.packages.split(",").map((value) => value.trim()).filter(Boolean), variables: parseVariables(form.variables) }); setOpen(false); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); } };
   return <div className="page"><div className="detail-hero"><Link className="back-link" to="/environments">Environments</Link><ChevronRight size={15} /><span>{item.name}</span><div className="detail-actions"><button className="button primary" onClick={() => setOpen(true)}>编辑配置</button></div></div>{error && <ErrorBanner error={error} />}
     <section className="identity-card"><span className="resource-icon large blue"><Box size={24} /></span><div><h1>{item.name}</h1><p>{item.description || "暂无描述"}</p><small>{item.id} · 更新于 {new Date(item.updatedAt).toLocaleString()}</small></div></section>
-    <div className="detail-grid"><section className="panel detail-panel"><h3>配置</h3><dl className="kv-list"><div><dt>预装包</dt><dd>{item.packages.join(" · ") || "未配置"}</dd></div><div><dt>环境变量</dt><dd>{item.variables.map((value) => value.key).join(" · ") || "未配置"}</dd></div><div><dt>文件系统</dt><dd>{item.filesystemMode}</dd></div><div><dt>网络 allowlist</dt><dd>{item.networkAllowlist.join(" · ") || "默认拒绝"}</dd></div></dl></section><section className="panel detail-panel"><h3>关联 Session · {sessions.length}</h3>{sessions.length ? <div className="table-wrap"><table><thead><tr><th>Session</th><th>状态</th><th>Agent 版本</th></tr></thead><tbody>{sessions.map((session) => <tr key={session.id}><td><Link to={`/sessions/${session.id}`}>{session.name}</Link><small>{session.id}</small></td><td><Status value={session.status} /></td><td>V{session.agentVersion ?? 1}</td></tr>)}</tbody></table></div> : <EmptyState title="暂无关联 Session" description="创建 Session 时选择此 Environment。" />}</section></div>
+    <div className="detail-grid"><section className="panel detail-panel"><h3>配置</h3><dl className="kv-list"><div><dt>预装包</dt><dd>{item.packages.join(" · ") || "未配置"}</dd></div><div><dt>环境变量</dt><dd>{item.variables.map((value) => value.key).join(" · ") || "未配置"}</dd></div><div><dt>执行边界</dt><dd>平台托管 Sandbox Policy</dd></div><div><dt>网络</dt><dd>{item.networkAllowlist.length ? "受控 allowlist" : "默认拒绝"}</dd></div></dl></section><section className="panel detail-panel"><h3>关联 Session · {sessions.length}</h3>{sessions.length ? <div className="table-wrap"><table><thead><tr><th>Session</th><th>状态</th><th>Agent 版本</th></tr></thead><tbody>{sessions.map((session) => <tr key={session.id}><td><Link to={`/sessions/${session.id}`}>{session.name}</Link><small>{session.id}</small></td><td><Status value={session.status} /></td><td>V{session.agentVersion ?? 1}</td></tr>)}</tbody></table></div> : <EmptyState title="暂无关联 Session" description="创建 Session 时选择此 Environment。" />}</section></div>
     <EnvironmentModal open={open} form={form} setForm={setForm} onClose={() => setOpen(false)} onSave={() => void save()} title="编辑 Environment" />
   </div>;
 }
@@ -152,7 +149,7 @@ export function MemoryPage() {
   useEffect(() => { void load(); }, [load]);
   const create = async () => { try { await api.create("memory-stores", form); setOpen(false); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); } };
   const filtered = items.filter((item) => `${item.name} ${item.id}`.toLowerCase().includes(search.toLowerCase()));
-  return <div className="page"><PageHeader title="Memory Stores" description="为 Agent 提供跨 Session 的显式长期记忆；每条 Memory 都有独立生命周期。" action={<button className="button primary" onClick={() => setOpen(true)}><Plus size={16} />创建 Memory Store</button>} />{error && <ErrorBanner error={error} />}<section className="panel"><Toolbar search={search} onSearch={setSearch} />{filtered.length ? <div className="table-wrap"><table><thead><tr><th>名称 / ID</th><th>描述</th><th>关联 Session</th><th>Memory 数量</th><th>存储用量</th><th /></tr></thead><tbody>{filtered.map((item) => <tr key={item.id}><td><Link className="resource-link" to={`/memory/${item.id}`}><span className="resource-icon green"><Brain size={16} /></span><span><strong>{item.name}</strong><small>{item.id}</small></span></Link></td><td>{item.description || <span className="muted">暂无描述</span>}</td><td>{sessions.filter((session) => session.memoryStoreIds.includes(item.id)).length}</td><td>{item.memories.length}</td><td>{item.memories.reduce((sum, memory) => sum + new Blob([memory.content]).size, 0)} B</td><td><Link className="icon-button" to={`/memory/${item.id}`}><ChevronRight size={17} /></Link></td></tr>)}</tbody></table></div> : <EmptyState title="暂无 Memory Store" description="把跨任务稳定知识放进 Memory，而不是压缩覆盖 Session 事件。" />}</section><Modal title="创建 Memory Store" open={open} onClose={() => setOpen(false)} footer={<><button className="button secondary" onClick={() => setOpen(false)}>取消</button><button className="button primary" onClick={() => void create()} disabled={!form.name}>创建</button></>}><label>名称<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>描述<textarea rows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Agent 应在什么情况下查询这组记忆" /></label><label>添加首条 Memory<textarea rows={5} value={form.content} onChange={(event) => setForm({ ...form, content: event.target.value })} placeholder="可留空，稍后再添加" /></label></Modal></div>;
+  return <div className="page"><PageHeader title="Memory Stores" description="为 Agent 提供跨 Session 的显式长期记忆；当前不会从 Session 自动抽取。" action={<button className="button primary" onClick={() => setOpen(true)}><Plus size={16} />创建 Memory Store</button>} />{error && <ErrorBanner error={error} />}<div className="security-note memory-policy-note"><Brain size={18} /><div><strong>写入策略：explicit</strong><p>只有人类/API 的显式新增、编辑和删除会改变 Memory；Session compact 与长期 Memory 是两种不同机制。</p></div></div><section className="panel"><Toolbar search={search} onSearch={setSearch} />{filtered.length ? <div className="table-wrap"><table><thead><tr><th>名称 / ID</th><th>描述</th><th>关联 Session</th><th>Memory 数量</th><th>存储用量</th><th /></tr></thead><tbody>{filtered.map((item) => <tr key={item.id}><td><Link className="resource-link" to={`/memory/${item.id}`}><span className="resource-icon green"><Brain size={16} /></span><span><strong>{item.name}</strong><small>{item.id}</small></span></Link></td><td>{item.description || <span className="muted">暂无描述</span>}</td><td>{sessions.filter((session) => session.memoryStoreIds.includes(item.id)).length}</td><td>{item.memories.length}</td><td>{item.memories.reduce((sum, memory) => sum + new Blob([memory.content]).size, 0)} B</td><td><Link className="icon-button" to={`/memory/${item.id}`}><ChevronRight size={17} /></Link></td></tr>)}</tbody></table></div> : <EmptyState title="暂无 Memory Store" description="把跨任务稳定知识放进 Memory，而不是压缩覆盖 Session 事件。" />}</section><Modal title="创建 Memory Store" open={open} onClose={() => setOpen(false)} footer={<><button className="button secondary" onClick={() => setOpen(false)}>取消</button><button className="button primary" onClick={() => void create()} disabled={!form.name}>创建</button></>}><label>名称<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>描述<textarea rows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Agent 应在什么情况下查询这组记忆" /></label><label>添加首条 Memory<textarea rows={5} value={form.content} onChange={(event) => setForm({ ...form, content: event.target.value })} placeholder="可留空，稍后再添加" /></label></Modal></div>;
 }
 
 export function MemoryDetailPage() {

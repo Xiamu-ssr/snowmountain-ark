@@ -225,3 +225,19 @@ test("drains a queued interaction persisted before startup", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("serves the validated YAML Spec bundle with runtime facts", async () => {
+  const root = await mkdtemp(join(tmpdir(), "snowmountain-specs-"));
+  const app = await buildApp({ databasePath: join(root, "test.db"), dataDir: root, seed: true });
+  try {
+    const response = await app.inject({ method: "GET", url: "/v1/specs" });
+    assert.equal(response.statusCode, 200, response.body);
+    const bundle = response.json<{ format: string; items: Array<{ dsl: string; metadata: { id: string } }>; runtimeFacts: Array<{ id: string }> }>();
+    assert.equal(bundle.format, "snowmountain.spec.bundle/v1");
+    assert.ok(bundle.items.some((item) => item.dsl === "snowmountain.spec/v1" && item.metadata.id === "session.lifecycle"));
+    assert.ok(bundle.runtimeFacts.some((fact) => fact.id === "runtime.harness"));
+  } finally {
+    await app.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});

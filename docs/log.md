@@ -9,7 +9,17 @@ timestamp: 2026-07-13T23:58:00+08:00
 
 ## 2026-07-14
 
-- 明确雪山方舟是数据库驱动的完整中台；只有雪山 Market 是 Git-first，OKF/DSL 是 SDD 对齐文档而非运行时。
+- 纠正对话归属：SDD/DSL 长对话对象是 Claude Fable 5，Opus 4.6 是话题起点而非对话模型。
+- 移除 Managed Agents 侧栏中的 SDD 业务栏目，建立内容无关的独立 Spec Viewer。
+- 新增六份 `snowmountain.spec/v1` YAML 契约、JSON Schema、语义校验、引用/覆盖检查和生成式 Viewer bundle；CI 会拒绝不可达状态、越界能力、断裂引用与过期投影。
+- 明确部署 Agent 使用自研简易 Harness 的 deterministic 模式（无 LLM 推理），OpenAI-compatible 循环只是可选适配器；SDK runtime 仍标记为 partial/planned。
+- 依据火山方舟真实表单收敛 Environment/Session：人类只选择依赖、变量和绑定资源，文件权限与 CPU/内存等由平台 Sandbox Policy 托管。
+- 明确 Memory 当前只支持显式 CRUD/绑定读取，不会从 Session 或 context compact 自动沉淀。
+- 定位 Market “offline”根因是服务器无法建立到 GitHub Pages 的出站 TLS；改为连接独立部署的本地 Market 实例，同时保留公开 Viewer URL。
+- 修正 Market 本地镜像生成的详情链接，使 Ark 卡片始终指向公开 Git endpoint；无请求体的 POST 不再错误声明 JSON body。
+- 新增 Runtime/Sandbox/Memory 决策笔记，明确 Docker/runc 当前边界以及 gVisor、microVM 与 SDK adapter 的演进位置。
+
+- 明确雪山方舟是数据库驱动的完整中台；只有雪山 Market 是 Git-first。OKF 是知识文档，Spec DSL 是开发对齐契约，两者都不替代运行时数据库。
 - 完成登录、CSRF、防爆破限流、审计事件与生产 Cookie 边界。
 - 将 Docker Socket 从 API 进程移到独立、共享 Token 鉴权的 Sandbox Worker；Worker 不持有 Vault 或模型凭证。
 - 增加 SQLite 持久 Interaction Queue、最多四路并发、排队恢复与运行中断显式失败语义。

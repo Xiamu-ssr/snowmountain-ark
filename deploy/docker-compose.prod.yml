@@ -12,7 +12,8 @@ services:
       SANDBOX_WORKER_URL: http://worker:4312
       SANDBOX_WORKER_TOKEN: ${SANDBOX_WORKER_TOKEN}
       SANDBOX_IMAGE: ${SANDBOX_IMAGE:-alpine:3.20}
-      MARKET_INDEX_URL: https://xiamu-ssr.github.io/snowmountain-market/api/catalog.json
+      MARKET_INDEX_URL: ${MARKET_INDEX_URL:-https://xiamu-ssr.github.io/snowmountain-market/api/catalog.json}
+      MARKET_PUBLIC_URL: ${MARKET_PUBLIC_URL:-https://xiamu-ssr.github.io/snowmountain-market/}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       AUTH_COOKIE_SECURE: "true"

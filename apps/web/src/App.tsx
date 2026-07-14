@@ -5,12 +5,13 @@ import { AgentCreatePage, AgentDetailPage, AgentEditPage, AgentsPage } from "./p
 import { DependenciesPage } from "./pages/Dependencies";
 import { MarketPage } from "./pages/Market";
 import { EnvironmentDetailPage, EnvironmentsPage, MemoryDetailPage, MemoryPage, VaultDetailPage, VaultsPage } from "./pages/Resources";
-import { SddPage } from "./pages/Sdd";
+import { SpecViewerPage } from "./pages/Specs";
 import { SessionDetailPage, SessionsPage } from "./pages/Sessions";
 import { SettingsPage } from "./pages/Settings";
 
 export function App() {
   return <AuthGate><Routes>
+    <Route path="specs" element={<SpecViewerPage />} />
     <Route element={<Shell />}>
       <Route index element={<Navigate to="/agents" replace />} />
       <Route path="agents" element={<AgentsPage />} />
@@ -25,7 +26,6 @@ export function App() {
       <Route path="vaults/:id" element={<VaultDetailPage />} />
       <Route path="memory" element={<MemoryPage />} />
       <Route path="memory/:id" element={<MemoryDetailPage />} />
-      <Route path="sdd" element={<SddPage />} />
       <Route path="market" element={<MarketPage />} />
       <Route path="dependencies" element={<DependenciesPage />} />
       <Route path="settings" element={<SettingsPage />} />

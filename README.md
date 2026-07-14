@@ -6,7 +6,7 @@
 
 - **雪山方舟不是 Git-first 系统。** Agent、版本、Session、事件、Environment、Credential、Memory 和 API Key 的事实源是运行中的数据库；Sandbox 工作区是 Session 的持久运行数据。
 - **雪山 Market 才是 Git-first。** Market 的能力声明、版本、权限和安装说明以 Git 中的 OKF Markdown/Manifest 为事实源，构建后发布静态前端和 Catalog/Artifact HTTP endpoints。
-- **OKF/SDD 是文档与对齐介质。** DSL 可以生成视图、校验和验收测试，但不会替代方舟数据库、状态机或运行时。
+- **OKF 与 Spec 分层。** OKF Markdown 保存 why、研究与读书笔记；`spec/contracts/*.yaml` 是介于意图和代码之间的可校验 DSL。代码、测试和 Viewer 都引用它，不能拿 Markdown 或手绘视图充当第二事实源。
 
 目前已具备：
 
@@ -20,7 +20,7 @@
 - AES-256-GCM Credential Vault，以及 OAuth Client Credentials 自动换取/刷新；
 - OpenAI-compatible 模型端点与本地确定性 Harness；
 - 雪山 Market catalog 对接；
-- React 人类控制台、预览/调试事件工作台、结构化 Inspector、API 接入、SDD 对齐页和依赖图。
+- React 人类控制台、预览/调试事件工作台、结构化 Inspector、API 接入和依赖图；开发者 Spec Viewer 与 Managed Agents 业务导航分离。
 
 ## 架构
 
@@ -48,6 +48,7 @@ flowchart LR
 
 ```bash
 pnpm install
+pnpm spec:check
 pnpm test
 pnpm build
 pnpm dev
@@ -141,6 +142,12 @@ Harness 支持标准 Chat Completions tool call 循环。生产版应把模型 C
 - 三篇 Anthropic Engineering 文章的读书笔记、原链接和图示索引；
 - 火山方舟逐页反向工程与真实 Session 探针；
 - 用户长对话的逐字原始文件、结构化 Markdown 和独立理解。
+
+## Spec DSL 与 Viewer
+
+[`spec/README.md`](./spec/README.md) 定义本项目的 Spec Profile。当前六份 YAML 契约覆盖 Session 状态机、Sandbox 能力隔离、Agent Runtime、Memory 生命周期、Market 集成和中台能力进度。JSON Schema 与语义校验会检查状态可达性、引用完整性、实现/测试路径以及互斥能力；生成的 `spec/generated/bundle.json` 是 Viewer 数据源。
+
+开发者从控制台右上角进入 `/specs`。Viewer 本身不包含雪山方舟内容，只按数据源渲染 Intent、Contract、Implementation、Verification、状态机、能力矩阵、功能进度和原始 YAML。它不是 Managed Agents 的业务栏目。
 
 ## 安全边界
 

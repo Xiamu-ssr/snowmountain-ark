@@ -65,8 +65,9 @@ while (cursor < lines.length) {
 const output = [
   "---",
   "type: conversation-transcript",
-  "title: \"从 Opus 4.6 惊艳到精确 DSL：一场关于 Agent、SDD 与评测的长对话\"",
-  "description: \"用户与另一位 Agent 围绕基础模型、Spec-Driven Development、评测、DSL、记忆和产品形态展开的完整对话。\"",
+  "title: \"从 Opus 4.6 惊艳到精确 DSL：与 Claude Fable 5 的长对话\"",
+  "description: \"用户与 Claude Fable 5 围绕基础模型、Spec-Driven Development、评测、DSL、记忆和产品形态展开的完整对话。\"",
+  "interlocutor: \"Anthropic: Claude Fable 5 | Google Vertex\"",
   "resource: ./opus46-sdd-dialogue.raw.txt",
   "tags: [agent, managed-agents, sdd, spec, dsl, evaluation, memory]",
   "timestamp: 2026-07-13T00:00:00+08:00",

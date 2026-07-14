@@ -10,9 +10,11 @@ timestamp: 2026-07-13T23:58:00+08:00
 
 本目录按 Google Open Knowledge Format（OKF）v0.1 的最小约定组织：一条概念一个 Markdown 文件、YAML frontmatter 提供结构化字段、普通 Markdown 链接组成知识图谱。它既能直接在 GitHub 阅读，也能被 Agent、静态站点和索引器消费。
 
+可执行语义不在本目录复述。项目契约的唯一事实源位于 [`../spec/contracts/`](../spec/contracts/)，Schema、校验器和 Viewer 规则见 [`../spec/README.md`](../spec/README.md)。OKF 回答 why 与背景，Spec 回答必须精确满足什么，运行系统提供实际证据。
+
 ## 原始资料与对话
 
-- [Opus 4.6、SDD 与精确 DSL 长对话（结构化原文）](./sources/conversations/opus46-sdd-dialogue.md)
+- [与 Claude Fable 5 关于 Opus 4.6、SDD 与精确 DSL 的长对话（结构化原文）](./sources/conversations/opus46-sdd-dialogue.md)
 - [逐字原始粘贴](./sources/conversations/opus46-sdd-dialogue.raw.txt)
 
 ## 研究笔记
@@ -21,7 +23,8 @@ timestamp: 2026-07-13T23:58:00+08:00
 - [Managed Agents：把大脑、双手和历史分开](./notes/anthropic-managed-agents.md)
 - [Claude Code Auto Mode：概率审批如何嵌入确定性边界](./notes/anthropic-auto-mode.md)
 - [Containment：能力越强，越要限制爆炸半径](./notes/anthropic-containment.md)
-- [长对话读书笔记：从对抗基模到设计收敛系统](./notes/opus46-sdd-dialogue-reading-notes.md)
+- [Fable 5 长对话读书笔记：从对抗基模到设计收敛系统](./notes/fable5-sdd-dialogue-reading-notes.md)
+- [Agent Runtime、Sandbox、资源与 Memory 的事实边界](./notes/runtime-sandbox-memory-decisions.md)
 - [火山方舟 Managed Agents 反向工程记录](./notes/volcengine-managed-agents-reverse-engineering.md)
 
 ## 工程原则

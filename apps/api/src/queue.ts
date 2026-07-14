@@ -1,6 +1,6 @@
 import type { InteractionJob, Session } from "@snowmountain/contracts";
 import { Store } from "./db.js";
-import { Harness } from "./harness.js";
+import type { AgentRuntime } from "./runtime.js";
 
 export class InteractionQueue {
   private readonly activeSessions = new Set<string>();
@@ -9,7 +9,7 @@ export class InteractionQueue {
 
   constructor(
     private readonly store: Store,
-    private readonly harness: Harness,
+    private readonly runtime: AgentRuntime,
     private readonly concurrency = 4,
     private readonly onError: (error: unknown) => void = () => undefined
   ) {
@@ -38,7 +38,7 @@ export class InteractionQueue {
   }
 
   stop(sessionId: string): boolean {
-    return this.store.cancelQueuedInteraction(sessionId) || this.harness.stop(sessionId);
+    return this.store.cancelQueuedInteraction(sessionId) || this.runtime.stop(sessionId);
   }
 
   close(): void {
@@ -64,7 +64,7 @@ export class InteractionQueue {
 
   private async execute(job: InteractionJob): Promise<void> {
     try {
-      await this.harness.run(job.sessionId, job.content);
+      await this.runtime.run(job.sessionId, job.content);
       this.store.finishInteractionJob(job.id, "completed");
     } catch (error) {
       this.store.finishInteractionJob(job.id, "failed", error instanceof Error ? error.message : String(error));
