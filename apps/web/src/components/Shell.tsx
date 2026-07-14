@@ -1,6 +1,6 @@
 import {
-  Bot, Box, Brain, ChevronDown, CircleHelp, Fingerprint, GitFork,
-  KeyRound, Layers3, Library, MountainSnow, Search, Store, Workflow
+  Bot, BookOpenCheck, Box, Brain, ChevronDown, CircleHelp, Fingerprint, GitFork,
+  KeyRound, Layers3, Library, MountainSnow, Search, Settings, Store, Workflow
 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
@@ -10,8 +10,10 @@ const nav = [
   { to: "/environments", label: "Environments", icon: Box },
   { to: "/vaults", label: "Credentials Vault", icon: KeyRound },
   { to: "/memory", label: "Memory", icon: Brain },
+  { to: "/sdd", label: "SDD", icon: BookOpenCheck },
   { to: "/market", label: "雪山 Market", icon: Store },
-  { to: "/dependencies", label: "Dependencies", icon: GitFork }
+  { to: "/dependencies", label: "Dependencies", icon: GitFork },
+  { to: "/settings", label: "系统设置", icon: Settings }
 ];
 
 export function Shell() {
@@ -32,7 +34,7 @@ export function Shell() {
         </div>
       </header>
       <aside className="sidebar">
-        <div className="sidebar-title"><Layers3 size={17} /><span>Managed Agents</span><span className="beta">BETA</span></div>
+        <div className="sidebar-title"><Layers3 size={17} /><span>Managed Agents</span></div>
         <nav>
           {nav.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
@@ -42,7 +44,7 @@ export function Shell() {
         </nav>
         <div className="sidebar-foot">
           <div className="control-badge"><span className="pulse" /><span>Control plane</span><strong>healthy</strong></div>
-          <small>Session event log · SQLite<br />Sandbox · local development</small>
+          <small>Durable event log · SQLite<br />Sandbox runtime · API control plane</small>
         </div>
       </aside>
       <main className="main-content"><Outlet /></main>

@@ -8,7 +8,7 @@ services:
       HOST: 0.0.0.0
       PORT: 4310
       SANDBOX_DRIVER: local
-      MARKET_INDEX_URL: http://host.docker.internal:4320/api/catalog.json
+      MARKET_INDEX_URL: https://xiamu-ssr.github.io/snowmountain-market/api/catalog.json
       VAULT_MASTER_KEY: ${VAULT_MASTER_KEY:-}
       MODEL_API_KEY: ${MODEL_API_KEY:-}
     volumes:

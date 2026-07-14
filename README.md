@@ -1,17 +1,23 @@
 # 雪山方舟 · Snowmountain Ark
 
-一个 Git-first 的 Managed Agents 控制面与运行时 Beta，借鉴火山方舟的资源模型，并按 Anthropic 的 Managed Agents / Auto Mode / Containment 经验重新组织内部边界。
+一个数据库驱动的 Managed Agents 完整中台：包含人类控制台、控制面 API、持久 Session、Harness、Sandbox、凭证代理、Memory、监控和外部数据面 API。产品交互借鉴火山方舟，并按 Anthropic 的 Managed Agents / Auto Mode / Containment 经验组织内部边界。
+
+## 架构边界：Ark 不是 Git-first
+
+- **雪山方舟不是 Git-first 系统。** Agent、版本、Session、事件、Environment、Credential、Memory 和 API Key 的事实源是运行中的数据库；Sandbox 工作区是 Session 的持久运行数据。
+- **雪山 Market 才是 Git-first。** Market 的能力声明、版本、权限和安装说明以 Git 中的 OKF Markdown/Manifest 为事实源，构建后发布静态前端和 Catalog/Artifact HTTP endpoints。
+- **OKF/SDD 是文档与对齐介质。** DSL 可以生成视图、校验和验收测试，但不会替代方舟数据库、状态机或运行时。
 
 目前已具备：
 
 - Agent 版本、模型、System Prompt、Skills、Tools、Multi Agents、MCPs 与工具级权限；
 - Session、Environment、Credentials Vault、Memory Store 与依赖删除保护；
-- SQLite 追加事件日志，逐项记录 User、Thinking、Policy、Tool Use、Tool Result、Assistant 与状态；
+- SQLite 追加事件日志，逐项记录 User、Thinking、模型请求/Tokens、Policy、Approval、Tool/MCP/Subagent、Assistant 与状态；
 - 同一 Session 跨任务持久的 `/workspace`；
 - 本地开发 Sandbox 和 Docker 硬隔离驱动；
 - OpenAI-compatible 模型端点与本地确定性 Harness；
 - 雪山 Market catalog 对接；
-- React 控制台、结构化事件 Inspector 和依赖图。
+- React 人类控制台、预览/调试事件工作台、结构化 Inspector、API 接入、SDD 对齐页和依赖图。
 
 ## 架构
 
@@ -57,7 +63,7 @@ cd ../XSEngine
 MARKET_INDEX_URL=http://127.0.0.1:4320/api/catalog.json pnpm dev:api
 ```
 
-Catalog 默认地址：`http://127.0.0.1:4320/api/catalog.json`。
+线上 Catalog 默认地址：`https://xiamu-ssr.github.io/snowmountain-market/api/catalog.json`；只有显式设置 `MARKET_INDEX_URL` 时才切换到本地 Market。
 
 ## Sandbox
 
@@ -100,12 +106,20 @@ Harness 支持标准 Chat Completions tool call 循环。生产版应把模型 C
 - `GET/POST /v1/credentials`
 - `GET/POST /v1/memory-stores`
 - `GET/POST /v1/sessions`
+- `GET/POST/DELETE /v1/api-keys`
+- `GET /v1/monitoring/summary`
+- `GET /v1/settings`
 
 数据面：
 
 - `POST /v1/sessions/:id/interactions`
 - `GET /v1/sessions/:id/events?after=N`
+- `GET /v1/sessions/:id/events/stream`（SSE）
+- `POST /v1/sessions/:id/approvals/:approvalId`
+- `POST /v1/sessions/:id/stop`
 - `POST /v1/sessions/:id/sandbox/inspect`
+- `POST /api/v1/sessions/:id/interactions`（Bearer API Key）
+- `GET /api/v1/sessions/:id/events`（Bearer API Key）
 - `GET /v1/dependencies`
 - `GET /v1/market/catalog`
 

@@ -14,7 +14,7 @@ export function EmptyState({ title, description }: { title: string; description:
 }
 
 export function Status({ value }: { value: string }) {
-  const tone = value === "idle" || value === "healthy" ? "success" : value === "running" ? "running" : value === "failed" ? "danger" : "neutral";
+  const tone = value === "idle" || value === "healthy" ? "success" : value === "running" || value === "waiting_approval" ? "running" : value === "failed" ? "danger" : "neutral";
   return <span className={`status ${tone}`}><span />{value}</span>;
 }
 

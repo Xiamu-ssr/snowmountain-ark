@@ -4,7 +4,8 @@ export type ResourceKind =
   | "vault"
   | "credential"
   | "memory-store"
-  | "session";
+  | "session"
+  | "api-key";
 
 export type ToolName =
   | "bash"
@@ -29,8 +30,26 @@ export interface BaseResource {
 export interface ModelConfig {
   provider: "mock" | "openai-compatible";
   name: string;
-  baseUrl?: string;
-  credentialId?: string;
+  baseUrl?: string | undefined;
+  credentialId?: string | undefined;
+  endpointId?: string | undefined;
+  displayName?: string | undefined;
+  contextWindow?: number | undefined;
+  inputPricePerK?: number | undefined;
+  cachedInputPricePerK?: number | undefined;
+  outputPricePerK?: number | undefined;
+  rpm?: number | undefined;
+  tpm?: number | undefined;
+}
+
+export interface McpServerBinding {
+  id: string;
+  name: string;
+  url: string;
+  permission: Exclude<PermissionMode, "workspace">;
+  credentialId?: string | undefined;
+  source: "preset" | "manual" | "market";
+  description?: string | undefined;
 }
 
 export interface Agent extends BaseResource {
@@ -41,7 +60,9 @@ export interface Agent extends BaseResource {
   systemPrompt: string;
   skillIds: string[];
   mcpIds: string[];
+  mcpServers?: McpServerBinding[] | undefined;
   subAgentIds: string[];
+  subAgentVersions?: Record<string, number> | undefined;
   toolPolicies: Record<ToolName, PermissionMode>;
   tags: string[];
 }
@@ -70,7 +91,13 @@ export interface Credential extends BaseResource {
   serverUrl: string;
   authType: "bearer" | "oauth";
   secretCiphertext: string;
-  lastValidatedAt?: string;
+  mcpServerId?: string | undefined;
+  mcpServerName?: string | undefined;
+  clientId?: string | undefined;
+  clientSecretCiphertext?: string | undefined;
+  expiresAt?: string | undefined;
+  validationStatus?: "unvalidated" | "valid" | "invalid" | undefined;
+  lastValidatedAt?: string | undefined;
 }
 
 export interface MemoryEntry {
@@ -79,6 +106,7 @@ export interface MemoryEntry {
   content: string;
   tags: string[];
   createdAt: string;
+  updatedAt?: string | undefined;
 }
 
 export interface MemoryStore extends BaseResource {
@@ -86,18 +114,39 @@ export interface MemoryStore extends BaseResource {
   memories: MemoryEntry[];
 }
 
-export type SessionStatus = "idle" | "running" | "failed" | "stopped";
+export type SessionStatus = "idle" | "running" | "waiting_approval" | "failed" | "stopped";
+
+export interface SessionResourceConfig {
+  cpu: number;
+  memoryMiB: number;
+  maxRuntimeSeconds: number;
+  networkMode: "deny" | "allowlist";
+}
+
+export interface PendingApproval {
+  id: string;
+  call: ToolCall;
+  reason: string;
+  createdAt: string;
+}
 
 export interface Session extends BaseResource {
   kind: "session";
   agentId: string;
+  agentVersion: number;
   environmentId: string;
   memoryStoreIds: string[];
   status: SessionStatus;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
   workspacePath: string;
-  lastError?: string;
+  resourceConfig: SessionResourceConfig;
+  pendingApproval?: PendingApproval | undefined;
+  startedAt?: string | undefined;
+  stoppedAt?: string | undefined;
+  lastError?: string | undefined;
 }
 
 export type SessionEventType =
@@ -107,6 +156,14 @@ export type SessionEventType =
   | "tool_use"
   | "tool_result"
   | "policy"
+  | "model_request_start"
+  | "model_request_end"
+  | "approval_request"
+  | "approval_result"
+  | "mcp_use"
+  | "mcp_result"
+  | "subagent_use"
+  | "subagent_result"
   | "status"
   | "error";
 
@@ -121,7 +178,7 @@ export interface SessionEvent<T = unknown> {
 
 export interface ToolCall {
   id: string;
-  name: ToolName;
+  name: string;
   input: Record<string, unknown>;
 }
 
@@ -140,7 +197,7 @@ export interface MarketEntry {
   tags: string[];
   resource: string;
   downloadUrl: string;
-  sha256?: string;
+  sha256?: string | undefined;
   permissions: string[];
   runtime: string;
   source: "local" | "remote";
@@ -152,13 +209,35 @@ export interface DependencyEdge {
   relation: string;
 }
 
+export interface ApiKey extends BaseResource {
+  kind: "api-key";
+  keyPrefix: string;
+  keyHash: string;
+  lastUsedAt?: string | undefined;
+  revokedAt?: string | undefined;
+}
+
+export interface MonitoringSummary {
+  sessions: number;
+  running: number;
+  waitingApproval: number;
+  failed: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  toolCalls: number;
+  modelRequests: number;
+}
+
 export type ManagedResource =
   | Agent
   | Environment
   | Vault
   | Credential
   | MemoryStore
-  | Session;
+  | Session
+  | ApiKey;
 
 export const defaultToolPolicies: Record<ToolName, PermissionMode> = {
   bash: "approval",

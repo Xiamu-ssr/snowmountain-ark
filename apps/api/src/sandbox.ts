@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
@@ -48,7 +48,7 @@ export class Sandbox {
   async execute(call: ToolCall, session: Session, environment: Environment): Promise<unknown> {
     switch (call.name) {
       case "bash":
-        return this.runCommand(session.id, String(call.input.command ?? ""));
+        return this.runCommand(session, environment, String(call.input.command ?? ""));
       case "read": {
         const filePath = await this.workspacePath(session.id, String(call.input.file_path ?? ""));
         return { content: await readFile(filePath, "utf8"), file_path: this.publicPath(session.id, filePath) };
@@ -70,10 +70,10 @@ export class Sandbox {
         return { replacements: 1, file_path: this.publicPath(session.id, filePath) };
       }
       case "glob":
-        return this.runCommand(session.id, `find . -type f -maxdepth 6 | sort | head -200`);
+        return this.runCommand(session, environment, "find . -type f -maxdepth 6 | sort | head -200");
       case "grep": {
         const query = String(call.input.pattern ?? "").replaceAll("'", "'\\''");
-        return this.runCommand(session.id, `grep -RIn -- '${query}' . | head -200`);
+        return this.runCommand(session, environment, `grep -RIn -- '${query}' . | head -200`);
       }
       case "web_fetch": {
         const response = await fetch(String(call.input.url), { signal: AbortSignal.timeout(15_000) });
@@ -93,25 +93,32 @@ export class Sandbox {
     return suffix ? `/workspace/${suffix}` : "/workspace";
   }
 
-  private async runCommand(sessionId: string, command: string): Promise<unknown> {
-    const workspace = await this.provision(sessionId);
+  private async runCommand(session: Session, environment: Environment, command: string): Promise<unknown> {
+    const workspace = await this.provision(session.id);
+    const resource = session.resourceConfig ?? { cpu: 1, memoryMiB: 512, maxRuntimeSeconds: 3600, networkMode: "deny" as const };
+    const environmentArgs = environment.variables.flatMap((variable) => ["-e", `${variable.key}=${variable.value}`]);
     if (this.options.driver === "docker") {
       const { stdout, stderr } = await execFileAsync("docker", [
         "run", "--rm", "--network", "none", "--read-only",
         "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
         "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-        "--pids-limit", "128", "--memory", "512m", "--cpus", "1",
+        "--pids-limit", "128", "--memory", `${resource.memoryMiB}m`, "--cpus", String(resource.cpu),
+        ...environmentArgs,
         "-v", `${workspace}:/workspace:rw`, "-w", "/workspace",
         this.options.image, "sh", "-lc", command
-      ], { timeout: 30_000, maxBuffer: 2_000_000 });
+      ], { timeout: Math.min(resource.maxRuntimeSeconds * 1000, 120_000), maxBuffer: 2_000_000 });
       return { stdout, stderr, exit_code: 0, driver: "docker" };
     }
 
     const { stdout, stderr } = await execFileAsync("/bin/sh", ["-lc", command], {
       cwd: workspace,
-      timeout: 30_000,
+      timeout: Math.min(resource.maxRuntimeSeconds * 1000, 120_000),
       maxBuffer: 2_000_000,
-      env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: workspace }
+      env: {
+        PATH: process.env.PATH ?? "/usr/bin:/bin",
+        HOME: workspace,
+        ...Object.fromEntries(environment.variables.map((variable) => [variable.key, variable.value]))
+      }
     });
     const canonicalWorkspace = await realpath(workspace);
     const normalizePath = (value: string) => value
@@ -129,5 +136,9 @@ export class Sandbox {
     const workspace = await this.provision(sessionId);
     const info = await stat(workspace);
     return { path: "/workspace", exists: info.isDirectory(), bytes: info.size };
+  }
+
+  async destroy(sessionId: string): Promise<void> {
+    await rm(resolve(this.options.dataDir, "workspaces", sessionId), { recursive: true, force: true });
   }
 }

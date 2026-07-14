@@ -9,7 +9,7 @@ timestamp: 2026-07-13T23:58:00+08:00
 
 # 火山方舟 Managed Agents 反向工程记录
 
-本记录来自 2026-07-13 对已登录火山方舟 Beta 控制台的只读检查，以及用户明确授权的低成本 Session 沙箱探针。标记为“观察”的内容来自 UI 或事件流；标记为“推断”的内容是产品设计解释。
+本记录来自 2026-07-13 至 2026-07-14 对已登录火山方舟 Beta 控制台的逐页检查，以及用户明确授权的低成本 Session 沙箱探针。标记为“观察”的内容来自 UI 或事件流；标记为“推断”的内容是产品设计解释。
 
 ## 一级资源
 
@@ -94,6 +94,17 @@ Session 详情同时是调试台：
 - 输入/输出 token 累计；
 - 空闲时可继续分配任务，运行中可终止；
 - API 接入向导先选择/创建 API Key，再复制示例代码。
+
+### 2026-07-14 二次核验补充
+
+- 调试模式不会只改变配色，而是切换到原始事件协议视图。实际观察到 `span.model_request_start`、`span.model_request_end`、`agent.thinking`、`agent.tool_use`、`agent.tool_result`、`agent.message`、`session.thread_status_running/idle` 与 `session.status_running/idle`。
+- 每个 `model_request_end` 都显示独立 Token 账单，例如 `10,208 input -> 312 output · 9,984 cache read · 0 cache write`。所以 Tokens 页必须基于逐请求 usage 事件生成，不能只画累计总数。
+- 预览模式将同一原始协议投影为 User、Agent、Thinking、Tool Use、Tool Result、Idle 等人类可读时间线。预览和调试是同一事件源的两种 projection。
+- Multi Agents 最多添加 20 个；UI 明确提示“已是 Multi-Agent 的不可作为 subagent”，这是为了阻止无界嵌套和权限/成本爆炸。
+- MCP 添加器有“预置 / 手动输入”两个投影。手动输入字段是名称、URL、调用策略和操作，最多 20 个；调用策略仍是“完全访问 / 请求批准”。
+- Credential 的 MCP Server 既可从预置服务选择，也可填写自定义名称和 URL。OAuth 表单分为可选 Access Token 与可选 Client ID / Client secret，随后进入 MCP 授权流程。
+- API 接入是两步向导：获取/创建 API Key，再复制当前 Session 的示例代码。API 操作的仍是与控制台相同的 Session 和事件数据面。
+- Agent 的 Sessions 管理表明确显示 Session 所用 Agent 版本；这要求 Session 创建时固定版本，Agent 后续编辑不能污染既有 Session。
 
 ## 真实探针
 

@@ -1,4 +1,4 @@
-import type { Agent, Environment, PolicyDecision, ToolCall } from "@snowmountain/contracts";
+import type { Agent, Environment, PolicyDecision, ToolCall, ToolName } from "@snowmountain/contracts";
 
 const destructiveShell = [
   /\brm\s+-rf\s+(\/|~|\$HOME)\b/i,
@@ -9,9 +9,13 @@ const destructiveShell = [
 ];
 
 export function decidePolicy(call: ToolCall, agent: Agent, environment: Environment): PolicyDecision {
-  const mode = agent.toolPolicies[call.name] ?? "deny";
+  const mode = agent.toolPolicies[call.name as ToolName] ?? "deny";
   if (mode === "deny") return { effect: "deny", reason: `${call.name} is disabled for this agent`, rule: "tool.disabled" };
   if (mode === "approval") return { effect: "approval", reason: `${call.name} requires explicit approval`, rule: "tool.approval" };
+
+  if (environment.filesystemMode === "read-only" && ["write", "edit"].includes(call.name)) {
+    return { effect: "deny", reason: "Environment filesystem is read-only", rule: "filesystem.read-only" };
+  }
 
   if (call.name === "bash") {
     const command = String(call.input.command ?? "");

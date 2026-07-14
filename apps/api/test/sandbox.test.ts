@@ -9,8 +9,9 @@ import { Sandbox } from "../src/sandbox.js";
 const now = new Date().toISOString();
 const session: Session = {
   id: "sesn-test", kind: "session", name: "test", description: "", createdAt: now, updatedAt: now,
-  agentId: "agent-test", environmentId: "env-test", memoryStoreIds: [], status: "idle",
-  inputTokens: 0, outputTokens: 0, workspacePath: "/workspace"
+  agentId: "agent-test", agentVersion: 1, environmentId: "env-test", memoryStoreIds: [], status: "idle",
+  inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, workspacePath: "/workspace",
+  resourceConfig: { cpu: 1, memoryMiB: 512, maxRuntimeSeconds: 3600, networkMode: "deny" }
 };
 const environment: Environment = {
   id: "env-test", kind: "environment", name: "test", description: "", createdAt: now, updatedAt: now,

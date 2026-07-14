@@ -16,7 +16,8 @@ const prefixByKind: Record<ResourceKind, string> = {
   vault: "vlt",
   credential: "cred",
   "memory-store": "memstore",
-  session: "sesn"
+  session: "sesn",
+  "api-key": "ak"
 };
 
 interface ResourceRow {
@@ -133,6 +134,13 @@ export class Store {
   }
 
   delete(id: string): boolean {
+    const resource = this.get(id);
+    if (resource?.kind === "session") {
+      this.db.prepare("DELETE FROM session_events WHERE session_id = ?").run(id);
+    }
+    if (resource?.kind === "agent") {
+      this.db.prepare("DELETE FROM agent_versions WHERE agent_id = ?").run(id);
+    }
     const result = this.db.prepare("DELETE FROM resources WHERE id = ?").run(id);
     return Number(result.changes) > 0;
   }
@@ -148,6 +156,13 @@ export class Store {
       "SELECT data FROM agent_versions WHERE agent_id = ? ORDER BY version DESC"
     ).all(agentId) as unknown as ResourceRow[];
     return rows.map((row) => JSON.parse(row.data) as Agent);
+  }
+
+  getAgentVersion(agentId: string, version: number): Agent | undefined {
+    const row = this.db.prepare(
+      "SELECT data FROM agent_versions WHERE agent_id = ? AND version = ?"
+    ).get(agentId, version) as ResourceRow | undefined;
+    return row ? JSON.parse(row.data) as Agent : undefined;
   }
 
   appendEvent<T>(sessionId: string, type: SessionEventType, payload: T): SessionEvent<T> {
