@@ -25,18 +25,18 @@ contract:
     - { actor: bound-session-runtime, action: load_memory_entries, condition: memory_store_id_bound_at_session_creation }
   extraction:
     mode: disabled
-    policy: No automatic Session-to-Memory extraction exists; a future extractor requires provenance, confidence, deduplication, privacy and human-control semantics in a new Spec.
-  retention: Explicit entries persist until an authenticated deletion; Session event logs remain a separate source.
+    policy: 当前不存在 Session 到 Memory 的自动抽取；未来抽取器必须在新 Spec 中定义来源、置信度、去重、隐私与人类控制语义。
+  retention: 显式条目持续保存，直至通过认证的删除操作移除；Session 事件日志仍是独立数据源。
 implementation:
   code:
     - apps/api/src/app.ts
     - apps/api/src/harness.ts
     - apps/web/src/pages/Resources.tsx
   notes:
-    - Current UI supports explicit Memory CRUD and Session binding.
+    - 当前 UI 支持显式 Memory 增删改查与 Session 绑定。
 verification:
   tests:
     - apps/api/test/api.test.ts
   assertions:
-    - { id: no-implicit-write, assertion: Running a Session interaction does not silently create a Memory entry. }
-    - { id: explicit-binding, assertion: Only Memory Stores named on the Session are included in runtime context. }
+    - { id: no-implicit-write, assertion: 执行 Session 交互不得静默创建 Memory 条目。 }
+    - { id: explicit-binding, assertion: 只有 Session 明确绑定的 Memory Store 才能进入 Runtime 上下文。 }

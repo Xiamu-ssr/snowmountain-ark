@@ -20,12 +20,12 @@ specRefs: [sandbox.boundary, agent.runtime]
 contract:
   initial: idle
   states:
-    - { id: idle, label: Idle }
-    - { id: queued, label: Queued }
-    - { id: running, label: Running }
-    - { id: waiting_approval, label: Waiting for approval }
-    - { id: failed, label: Failed }
-    - { id: stopped, label: Stopped, terminal: true }
+    - { id: idle, label: 空闲 }
+    - { id: queued, label: 已排队 }
+    - { id: running, label: 运行中 }
+    - { id: waiting_approval, label: 等待审批 }
+    - { id: failed, label: 失败 }
+    - { id: stopped, label: 已停止, terminal: true }
   transitions:
     - { from: idle, event: interaction_submitted, to: queued, effect: persist_job_and_status_event }
     - { from: failed, event: explicit_retry, to: queued, effect: persist_new_job }
@@ -39,19 +39,19 @@ contract:
     - { from: waiting_approval, event: rejected, to: failed, effect: persist_denial }
     - { from: waiting_approval, event: control_plane_restart, to: failed, effect: require_explicit_retry }
   invariants:
-    - { id: one-active-job, assertion: At most one interaction executes for the same Session. }
-    - { id: append-only-evidence, assertion: Every state transition is represented by an append-only Session event. }
-    - { id: no-silent-replay, assertion: A job that was running at restart becomes failed and is not replayed automatically. }
+    - { id: one-active-job, assertion: 同一 Session 同时最多执行一个 Interaction。 }
+    - { id: append-only-evidence, assertion: 每次状态转换都必须写入只追加的 Session 事件。 }
+    - { id: no-silent-replay, assertion: 重启时仍在运行的 Job 必须转为失败，不得自动重放。 }
 implementation:
   code:
     - apps/api/src/queue.ts
     - apps/api/src/db.ts
     - apps/api/src/harness.ts
   notes:
-    - SQLite WAL is the current durable queue and event-store implementation.
+    - 当前持久队列与事件存储由 SQLite WAL 实现。
 verification:
   tests:
     - apps/api/test/api.test.ts
   assertions:
-    - { id: queue-restart, assertion: A queued interaction persisted before startup is drained after restart. }
-    - { id: workspace-restart, assertion: A Session reads the same workspace file after the API process is restarted. }
+    - { id: queue-restart, assertion: 启动前已持久化的排队 Interaction 会在重启后继续处理。 }
+    - { id: workspace-restart, assertion: API 进程重启后，Session 仍能读取同一 Workspace 文件。 }

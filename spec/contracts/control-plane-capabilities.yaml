@@ -28,14 +28,14 @@ contract:
     - { id: sessions, label: "Session、持久队列、审批与事件回放", status: verified, evidence: apps/api/test/api.test.ts }
     - { id: environments, label: Environment 依赖与普通变量, status: implemented, evidence: apps/web/src/pages/Resources.tsx }
     - { id: vault, label: Credential Vault、显式绑定与 OAuth 刷新, status: verified, evidence: apps/api/test/mcp.test.ts }
-    - { id: memory, label: Explicit Memory Stores, status: partial, evidence: spec/contracts/memory-lifecycle.yaml }
-    - { id: market, label: Git-first Market integration, status: implemented, evidence: spec/contracts/market-integration.yaml }
-    - { id: sandbox, label: Replaceable isolated execution backend, status: verified, evidence: apps/worker/test/worker.test.ts }
-    - { id: runtime, label: Production-grade agent SDK runtime, status: partial, evidence: spec/contracts/agent-runtime.yaml }
-    - { id: observability, label: "Audit, events and Prometheus metrics", status: implemented, evidence: apps/api/src/app.ts }
+    - { id: memory, label: 显式长期 Memory Store, status: partial, evidence: spec/contracts/memory-lifecycle.yaml }
+    - { id: market, label: Git-first Market 集成, status: implemented, evidence: spec/contracts/market-integration.yaml }
+    - { id: sandbox, label: 可替换的隔离执行后端, status: verified, evidence: apps/worker/test/worker.test.ts }
+    - { id: runtime, label: 生产级 Agent SDK Runtime, status: partial, evidence: spec/contracts/agent-runtime.yaml }
+    - { id: observability, label: "审计、事件与 Prometheus 指标", status: implemented, evidence: apps/api/src/app.ts }
   limitations:
-    - UI parity does not imply hidden service behavior parity with Volcengine.
-    - Runtime SDK choice, automatic Memory extraction and stronger-than-runc isolation remain explicit open contracts.
+    - UI 对齐不代表已经复刻火山方舟未公开的服务端行为。
+    - Runtime SDK 选型、Memory 自动抽取和强于 runc 的隔离仍是明确的开放契约。
 implementation:
   code:
     - apps/api/src/app.ts
@@ -47,5 +47,5 @@ verification:
     - apps/api/test/api.test.ts
     - apps/worker/test/worker.test.ts
   assertions:
-    - { id: honest-status, assertion: Partial capabilities are visibly distinct from implemented and verified capabilities. }
-    - { id: viewer-separation, assertion: The Managed Agents sidebar contains no SDD or project-document content. }
+    - { id: honest-status, assertion: 部分实现、已实现和已验证能力必须在界面中清楚区分。 }
+    - { id: viewer-separation, assertion: Managed Agents 业务侧栏不得包含 SDD 或项目文档栏目。 }

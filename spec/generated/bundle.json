@@ -119,8 +119,8 @@
           }
         ],
         "limitations": [
-          "Production currently has no model credential configured; the deployed acceptance Agent uses deterministic-local.",
-          "The bespoke loop does not yet provide the mature context management, subagent ergonomics and compatibility surface of a full agent SDK."
+          "生产环境当前未配置模型 Credential；线上验收 Agent 使用 deterministic-local。",
+          "自研循环尚不具备完整 Agent SDK 已成熟的上下文管理、子 Agent 易用性与兼容能力面。"
         ]
       },
       "implementation": {
@@ -131,7 +131,7 @@
           "apps/api/src/policy.ts"
         ],
         "notes": [
-          "Runtime adapters must never bypass Policy, Sandbox, Vault proxy or Session events."
+          "Runtime Adapter 绝不能绕过 Policy、Sandbox、Vault 代理或 Session 事件。"
         ]
       },
       "verification": {
@@ -142,16 +142,16 @@
         "assertions": [
           {
             "id": "stable-evidence",
-            "assertion": "Both deterministic and external-model paths emit the same event contract."
+            "assertion": "确定性路径与外部模型路径必须产生相同的事件契约。"
           },
           {
             "id": "replaceable-runtime",
-            "assertion": "Replacing the model adapter does not change Session identity or workspace ownership."
+            "assertion": "替换模型 Adapter 不得改变 Session 身份或 Workspace 所有权。"
           }
         ]
       },
       "sourcePath": "spec/contracts/agent-runtime.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: agent.runtime\n  title: Agent 运行时与模型工具循环\n  status: partial\n  owners: [agent-runtime]\n  tags: [harness, model, tools]\nintent:\n  summary: 保持 Session、Tool 与证据契约稳定，同时允许替换模型和 Agent Runtime 实现。\n  outcomes:\n    - 确定性测试无需外部 LLM。\n    - OpenAI-compatible Endpoint 通过同一 Policy 与事件面执行有上限的 Tool 循环。\n  nonGoals:\n    - 把当前自研 Harness 描述成与 Claude Agent SDK 或 OpenCode 功能等价。\nknowledge:\n  - docs/notes/anthropic-managed-agents.md\n  - docs/notes/anthropic-auto-mode.md\nspecRefs: [session.lifecycle, sandbox.boundary, tool.resolution, credential.binding]\ncontract:\n  role: replaceable-agent-harness\n  runtime: bespoke-simple-harness\n  adapters:\n    - { id: deterministic-local, label: 不调用 LLM 的本地确定性 Harness }\n    - { id: openai-compatible, label: OpenAI-compatible Chat Completions Tool 循环 }\n  ports:\n    - { id: interaction, direction: in, protocol: durable-interaction-job/v1 }\n    - { id: model, direction: out, protocol: openai-chat-completions-compatible }\n    - { id: tools, direction: out, protocol: policy-gated-tool-call/v1 }\n    - { id: evidence, direction: out, protocol: append-only-session-events/v1 }\n  features:\n    - { id: deterministic-mode, label: 确定性无 LLM 验收模式, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: openai-loop, label: OpenAI-compatible 模型与 Tool 循环, status: implemented, evidence: apps/api/src/harness.ts }\n    - { id: sdk-adapter, label: Claude Agent SDK 或 OpenCode Runtime Adapter, status: planned }\n    - { id: context-compaction, label: Runtime 上下文压缩, status: planned }\n  limitations:\n    - Production currently has no model credential configured; the deployed acceptance Agent uses deterministic-local.\n    - The bespoke loop does not yet provide the mature context management, subagent ergonomics and compatibility surface of a full agent SDK.\nimplementation:\n  code:\n    - apps/api/src/runtime.ts\n    - apps/api/src/harness.ts\n    - apps/api/src/mcp.ts\n    - apps/api/src/policy.ts\n  notes:\n    - Runtime adapters must never bypass Policy, Sandbox, Vault proxy or Session events.\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/api/test/mcp.test.ts\n  assertions:\n    - { id: stable-evidence, assertion: Both deterministic and external-model paths emit the same event contract. }\n    - { id: replaceable-runtime, assertion: Replacing the model adapter does not change Session identity or workspace ownership. }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: agent.runtime\n  title: Agent 运行时与模型工具循环\n  status: partial\n  owners: [agent-runtime]\n  tags: [harness, model, tools]\nintent:\n  summary: 保持 Session、Tool 与证据契约稳定，同时允许替换模型和 Agent Runtime 实现。\n  outcomes:\n    - 确定性测试无需外部 LLM。\n    - OpenAI-compatible Endpoint 通过同一 Policy 与事件面执行有上限的 Tool 循环。\n  nonGoals:\n    - 把当前自研 Harness 描述成与 Claude Agent SDK 或 OpenCode 功能等价。\nknowledge:\n  - docs/notes/anthropic-managed-agents.md\n  - docs/notes/anthropic-auto-mode.md\nspecRefs: [session.lifecycle, sandbox.boundary, tool.resolution, credential.binding]\ncontract:\n  role: replaceable-agent-harness\n  runtime: bespoke-simple-harness\n  adapters:\n    - { id: deterministic-local, label: 不调用 LLM 的本地确定性 Harness }\n    - { id: openai-compatible, label: OpenAI-compatible Chat Completions Tool 循环 }\n  ports:\n    - { id: interaction, direction: in, protocol: durable-interaction-job/v1 }\n    - { id: model, direction: out, protocol: openai-chat-completions-compatible }\n    - { id: tools, direction: out, protocol: policy-gated-tool-call/v1 }\n    - { id: evidence, direction: out, protocol: append-only-session-events/v1 }\n  features:\n    - { id: deterministic-mode, label: 确定性无 LLM 验收模式, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: openai-loop, label: OpenAI-compatible 模型与 Tool 循环, status: implemented, evidence: apps/api/src/harness.ts }\n    - { id: sdk-adapter, label: Claude Agent SDK 或 OpenCode Runtime Adapter, status: planned }\n    - { id: context-compaction, label: Runtime 上下文压缩, status: planned }\n  limitations:\n    - 生产环境当前未配置模型 Credential；线上验收 Agent 使用 deterministic-local。\n    - 自研循环尚不具备完整 Agent SDK 已成熟的上下文管理、子 Agent 易用性与兼容能力面。\nimplementation:\n  code:\n    - apps/api/src/runtime.ts\n    - apps/api/src/harness.ts\n    - apps/api/src/mcp.ts\n    - apps/api/src/policy.ts\n  notes:\n    - Runtime Adapter 绝不能绕过 Policy、Sandbox、Vault 代理或 Session 事件。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/api/test/mcp.test.ts\n  assertions:\n    - { id: stable-evidence, assertion: 确定性路径与外部模型路径必须产生相同的事件契约。 }\n    - { id: replaceable-runtime, assertion: 替换模型 Adapter 不得改变 Session 身份或 Workspace 所有权。 }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -238,38 +238,38 @@
           },
           {
             "id": "memory",
-            "label": "Explicit Memory Stores",
+            "label": "显式长期 Memory Store",
             "status": "partial",
             "evidence": "spec/contracts/memory-lifecycle.yaml"
           },
           {
             "id": "market",
-            "label": "Git-first Market integration",
+            "label": "Git-first Market 集成",
             "status": "implemented",
             "evidence": "spec/contracts/market-integration.yaml"
           },
           {
             "id": "sandbox",
-            "label": "Replaceable isolated execution backend",
+            "label": "可替换的隔离执行后端",
             "status": "verified",
             "evidence": "apps/worker/test/worker.test.ts"
           },
           {
             "id": "runtime",
-            "label": "Production-grade agent SDK runtime",
+            "label": "生产级 Agent SDK Runtime",
             "status": "partial",
             "evidence": "spec/contracts/agent-runtime.yaml"
           },
           {
             "id": "observability",
-            "label": "Audit, events and Prometheus metrics",
+            "label": "审计、事件与 Prometheus 指标",
             "status": "implemented",
             "evidence": "apps/api/src/app.ts"
           }
         ],
         "limitations": [
-          "UI parity does not imply hidden service behavior parity with Volcengine.",
-          "Runtime SDK choice, automatic Memory extraction and stronger-than-runc isolation remain explicit open contracts."
+          "UI 对齐不代表已经复刻火山方舟未公开的服务端行为。",
+          "Runtime SDK 选型、Memory 自动抽取和强于 runc 的隔离仍是明确的开放契约。"
         ]
       },
       "implementation": {
@@ -289,16 +289,16 @@
         "assertions": [
           {
             "id": "honest-status",
-            "assertion": "Partial capabilities are visibly distinct from implemented and verified capabilities."
+            "assertion": "部分实现、已实现和已验证能力必须在界面中清楚区分。"
           },
           {
             "id": "viewer-separation",
-            "assertion": "The Managed Agents sidebar contains no SDD or project-document content."
+            "assertion": "Managed Agents 业务侧栏不得包含 SDD 或项目文档栏目。"
           }
         ]
       },
       "sourcePath": "spec/contracts/control-plane-capabilities.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: control-plane.capabilities\n  title: Managed Agents 中台能力全景图\n  status: partial\n  owners: [control-plane]\n  tags: [ui, api, parity]\nintent:\n  summary: 用可审查的高密度投影向人类展示已验证、部分实现和规划中的平台能力。\n  outcomes:\n    - 进度来自结构化状态与验证证据，不要求人类阅读大量 Markdown 后自行推测。\n  nonGoals:\n    - 因为存在页面或路由就声称已经完整对齐火山方舟。\nknowledge:\n  - docs/notes/volcengine-managed-agents-reverse-engineering.md\nspecRefs: [session.lifecycle, sandbox.boundary, agent.runtime, memory.lifecycle, market.integration, tool.resolution, credential.binding]\ncontract:\n  role: human-and-api-control-plane\n  runtime: fastify-react-sqlite\n  adapters: []\n  ports:\n    - { id: human-console, direction: in, protocol: https-react }\n    - { id: control-api, direction: in, protocol: authenticated-rest }\n    - { id: data-api, direction: in, protocol: bearer-rest }\n  features:\n    - { id: agents, label: Agent 与不可变版本, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: sessions, label: \"Session、持久队列、审批与事件回放\", status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: environments, label: Environment 依赖与普通变量, status: implemented, evidence: apps/web/src/pages/Resources.tsx }\n    - { id: vault, label: Credential Vault、显式绑定与 OAuth 刷新, status: verified, evidence: apps/api/test/mcp.test.ts }\n    - { id: memory, label: Explicit Memory Stores, status: partial, evidence: spec/contracts/memory-lifecycle.yaml }\n    - { id: market, label: Git-first Market integration, status: implemented, evidence: spec/contracts/market-integration.yaml }\n    - { id: sandbox, label: Replaceable isolated execution backend, status: verified, evidence: apps/worker/test/worker.test.ts }\n    - { id: runtime, label: Production-grade agent SDK runtime, status: partial, evidence: spec/contracts/agent-runtime.yaml }\n    - { id: observability, label: \"Audit, events and Prometheus metrics\", status: implemented, evidence: apps/api/src/app.ts }\n  limitations:\n    - UI parity does not imply hidden service behavior parity with Volcengine.\n    - Runtime SDK choice, automatic Memory extraction and stronger-than-runc isolation remain explicit open contracts.\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/web/src/App.tsx\n  notes:\n    - 规范查看器是开发者投影，不是 Managed Agents 业务模块。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/worker/test/worker.test.ts\n  assertions:\n    - { id: honest-status, assertion: Partial capabilities are visibly distinct from implemented and verified capabilities. }\n    - { id: viewer-separation, assertion: The Managed Agents sidebar contains no SDD or project-document content. }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: control-plane.capabilities\n  title: Managed Agents 中台能力全景图\n  status: partial\n  owners: [control-plane]\n  tags: [ui, api, parity]\nintent:\n  summary: 用可审查的高密度投影向人类展示已验证、部分实现和规划中的平台能力。\n  outcomes:\n    - 进度来自结构化状态与验证证据，不要求人类阅读大量 Markdown 后自行推测。\n  nonGoals:\n    - 因为存在页面或路由就声称已经完整对齐火山方舟。\nknowledge:\n  - docs/notes/volcengine-managed-agents-reverse-engineering.md\nspecRefs: [session.lifecycle, sandbox.boundary, agent.runtime, memory.lifecycle, market.integration, tool.resolution, credential.binding]\ncontract:\n  role: human-and-api-control-plane\n  runtime: fastify-react-sqlite\n  adapters: []\n  ports:\n    - { id: human-console, direction: in, protocol: https-react }\n    - { id: control-api, direction: in, protocol: authenticated-rest }\n    - { id: data-api, direction: in, protocol: bearer-rest }\n  features:\n    - { id: agents, label: Agent 与不可变版本, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: sessions, label: \"Session、持久队列、审批与事件回放\", status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: environments, label: Environment 依赖与普通变量, status: implemented, evidence: apps/web/src/pages/Resources.tsx }\n    - { id: vault, label: Credential Vault、显式绑定与 OAuth 刷新, status: verified, evidence: apps/api/test/mcp.test.ts }\n    - { id: memory, label: 显式长期 Memory Store, status: partial, evidence: spec/contracts/memory-lifecycle.yaml }\n    - { id: market, label: Git-first Market 集成, status: implemented, evidence: spec/contracts/market-integration.yaml }\n    - { id: sandbox, label: 可替换的隔离执行后端, status: verified, evidence: apps/worker/test/worker.test.ts }\n    - { id: runtime, label: 生产级 Agent SDK Runtime, status: partial, evidence: spec/contracts/agent-runtime.yaml }\n    - { id: observability, label: \"审计、事件与 Prometheus 指标\", status: implemented, evidence: apps/api/src/app.ts }\n  limitations:\n    - UI 对齐不代表已经复刻火山方舟未公开的服务端行为。\n    - Runtime SDK 选型、Memory 自动抽取和强于 runc 的隔离仍是明确的开放契约。\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/web/src/App.tsx\n  notes:\n    - 规范查看器是开发者投影，不是 Managed Agents 业务模块。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/worker/test/worker.test.ts\n  assertions:\n    - { id: honest-status, assertion: 部分实现、已实现和已验证能力必须在界面中清楚区分。 }\n    - { id: viewer-separation, assertion: Managed Agents 业务侧栏不得包含 SDD 或项目文档栏目。 }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -507,12 +507,12 @@
         "endpoints": [
           {
             "id": "catalog",
-            "purpose": "Capability discovery and immutable artifact metadata",
+            "purpose": "能力发现与不可变制品元数据",
             "visibility": "internal"
           },
           {
             "id": "public-viewer",
-            "purpose": "Human browsing and installation guidance",
+            "purpose": "人类浏览与安装指导",
             "visibility": "public"
           }
         ],
@@ -520,7 +520,7 @@
           "timeoutMs": 5000,
           "success": "HTTP 2xx with snowmountain-market-catalog/v2、sources、分类信息和 items 数组"
         },
-        "fallback": "Serve the same Git-built static catalog from an independently deployed local Market container; never synthesize an empty catalog as healthy."
+        "fallback": "由独立部署的本地 Market Container 提供同一份 Git 构建静态目录；绝不能把伪造的空目录报告为健康。"
       },
       "implementation": {
         "code": [
@@ -529,7 +529,7 @@
           "deploy/docker-compose.prod.yml"
         ],
         "notes": [
-          "Production uses an internal Market service because the current Alibaba host cannot establish TLS to GitHub Pages."
+          "当前阿里云主机无法与 GitHub Pages 建立 TLS 连接，因此生产环境使用内部 Market 服务。"
         ]
       },
       "verification": {
@@ -539,16 +539,16 @@
         "assertions": [
           {
             "id": "catalog-shape",
-            "assertion": "A reachable Market response declares the expected format and returns capability items."
+            "assertion": "可达的 Market 响应必须声明预期格式并返回能力条目。"
           },
           {
             "id": "visible-failure",
-            "assertion": "An unreachable Market is rendered as unavailable with its endpoint and reason, never as not-yet-started."
+            "assertion": "Market 不可达时必须显示 Endpoint 与原因，不能伪装成‘尚未启动’。"
           }
         ]
       },
       "sourcePath": "spec/contracts/market-integration.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: integration\nmetadata:\n  id: market.integration\n  title: 雪山 Market 多来源 Catalog 集成\n  status: implemented\n  owners: [market, control-plane]\n  tags: [market, git-first, catalog]\nintent:\n  summary: 方舟从可独立部署的 Git-first Market 实例发现带来源、分类、风险和版本信息的能力。\n  outcomes:\n    - 方舟消费经过格式校验的 Catalog Endpoint，但不拥有 Market 的源数据。\n    - 当服务器无法访问 GitHub Pages 时，本地生产镜像仍然可用。\n    - 外部 Registry 同步结果进入 Git 快照，运行时不直接依赖 ClawHub、MCP Registry 或 Wind 在线。\n  nonGoals:\n    - 在 Market 内替用户安装能力或保存用户 Credential。\nknowledge:\n  - docs/notes/google-open-knowledge-format.md\nspecRefs: [agent.runtime]\ncontract:\n  provider: snowmountain-market\n  sourceOfTruth: git-repository\n  endpoints:\n    - { id: catalog, purpose: Capability discovery and immutable artifact metadata, visibility: internal }\n    - { id: public-viewer, purpose: Human browsing and installation guidance, visibility: public }\n  health:\n    timeoutMs: 5000\n    success: HTTP 2xx with snowmountain-market-catalog/v2、sources、分类信息和 items 数组\n  fallback: Serve the same Git-built static catalog from an independently deployed local Market container; never synthesize an empty catalog as healthy.\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/web/src/pages/Market.tsx\n    - deploy/docker-compose.prod.yml\n  notes:\n    - Production uses an internal Market service because the current Alibaba host cannot establish TLS to GitHub Pages.\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n  assertions:\n    - { id: catalog-shape, assertion: A reachable Market response declares the expected format and returns capability items. }\n    - { id: visible-failure, assertion: \"An unreachable Market is rendered as unavailable with its endpoint and reason, never as not-yet-started.\" }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: integration\nmetadata:\n  id: market.integration\n  title: 雪山 Market 多来源 Catalog 集成\n  status: implemented\n  owners: [market, control-plane]\n  tags: [market, git-first, catalog]\nintent:\n  summary: 方舟从可独立部署的 Git-first Market 实例发现带来源、分类、风险和版本信息的能力。\n  outcomes:\n    - 方舟消费经过格式校验的 Catalog Endpoint，但不拥有 Market 的源数据。\n    - 当服务器无法访问 GitHub Pages 时，本地生产镜像仍然可用。\n    - 外部 Registry 同步结果进入 Git 快照，运行时不直接依赖 ClawHub、MCP Registry 或 Wind 在线。\n  nonGoals:\n    - 在 Market 内替用户安装能力或保存用户 Credential。\nknowledge:\n  - docs/notes/google-open-knowledge-format.md\nspecRefs: [agent.runtime]\ncontract:\n  provider: snowmountain-market\n  sourceOfTruth: git-repository\n  endpoints:\n    - { id: catalog, purpose: 能力发现与不可变制品元数据, visibility: internal }\n    - { id: public-viewer, purpose: 人类浏览与安装指导, visibility: public }\n  health:\n    timeoutMs: 5000\n    success: HTTP 2xx with snowmountain-market-catalog/v2、sources、分类信息和 items 数组\n  fallback: 由独立部署的本地 Market Container 提供同一份 Git 构建静态目录；绝不能把伪造的空目录报告为健康。\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/web/src/pages/Market.tsx\n    - deploy/docker-compose.prod.yml\n  notes:\n    - 当前阿里云主机无法与 GitHub Pages 建立 TLS 连接，因此生产环境使用内部 Market 服务。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n  assertions:\n    - { id: catalog-shape, assertion: 可达的 Market 响应必须声明预期格式并返回能力条目。 }\n    - { id: visible-failure, assertion: \"Market 不可达时必须显示 Endpoint 与原因，不能伪装成‘尚未启动’。\" }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -601,9 +601,9 @@
         ],
         "extraction": {
           "mode": "disabled",
-          "policy": "No automatic Session-to-Memory extraction exists; a future extractor requires provenance, confidence, deduplication, privacy and human-control semantics in a new Spec."
+          "policy": "当前不存在 Session 到 Memory 的自动抽取；未来抽取器必须在新 Spec 中定义来源、置信度、去重、隐私与人类控制语义。"
         },
-        "retention": "Explicit entries persist until an authenticated deletion; Session event logs remain a separate source."
+        "retention": "显式条目持续保存，直至通过认证的删除操作移除；Session 事件日志仍是独立数据源。"
       },
       "implementation": {
         "code": [
@@ -612,7 +612,7 @@
           "apps/web/src/pages/Resources.tsx"
         ],
         "notes": [
-          "Current UI supports explicit Memory CRUD and Session binding."
+          "当前 UI 支持显式 Memory 增删改查与 Session 绑定。"
         ]
       },
       "verification": {
@@ -622,16 +622,16 @@
         "assertions": [
           {
             "id": "no-implicit-write",
-            "assertion": "Running a Session interaction does not silently create a Memory entry."
+            "assertion": "执行 Session 交互不得静默创建 Memory 条目。"
           },
           {
             "id": "explicit-binding",
-            "assertion": "Only Memory Stores named on the Session are included in runtime context."
+            "assertion": "只有 Session 明确绑定的 Memory Store 才能进入 Runtime 上下文。"
           }
         ]
       },
       "sourcePath": "spec/contracts/memory-lifecycle.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: data-lifecycle\nmetadata:\n  id: memory.lifecycle\n  title: 显式长期 Memory 生命周期\n  status: partial\n  owners: [memory]\n  tags: [memory, session, provenance]\nintent:\n  summary: 长期 Memory 是有来源的显式资源，不是对话历史的隐形副本。\n  outcomes:\n    - Session 创建时绑定零到多个 Memory Store，并读取其中当前条目。\n    - 在自动抽取策略被单独规范和审查前，写入只允许显式 API/UI 操作。\n  nonGoals:\n    - 自动把模型上下文 compact 当作可持久化的跨 Session Memory。\nknowledge:\n  - docs/notes/fable5-sdd-dialogue-reading-notes.md\nspecRefs: [session.lifecycle]\ncontract:\n  entity: memory-store\n  sourceOfTruth: sqlite-resource-memory-store\n  writes:\n    - { actor: authenticated-human-or-api, action: create_update_delete_memory_entry, condition: explicit_write_with_audit }\n  reads:\n    - { actor: bound-session-runtime, action: load_memory_entries, condition: memory_store_id_bound_at_session_creation }\n  extraction:\n    mode: disabled\n    policy: No automatic Session-to-Memory extraction exists; a future extractor requires provenance, confidence, deduplication, privacy and human-control semantics in a new Spec.\n  retention: Explicit entries persist until an authenticated deletion; Session event logs remain a separate source.\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/api/src/harness.ts\n    - apps/web/src/pages/Resources.tsx\n  notes:\n    - Current UI supports explicit Memory CRUD and Session binding.\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n  assertions:\n    - { id: no-implicit-write, assertion: Running a Session interaction does not silently create a Memory entry. }\n    - { id: explicit-binding, assertion: Only Memory Stores named on the Session are included in runtime context. }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: data-lifecycle\nmetadata:\n  id: memory.lifecycle\n  title: 显式长期 Memory 生命周期\n  status: partial\n  owners: [memory]\n  tags: [memory, session, provenance]\nintent:\n  summary: 长期 Memory 是有来源的显式资源，不是对话历史的隐形副本。\n  outcomes:\n    - Session 创建时绑定零到多个 Memory Store，并读取其中当前条目。\n    - 在自动抽取策略被单独规范和审查前，写入只允许显式 API/UI 操作。\n  nonGoals:\n    - 自动把模型上下文 compact 当作可持久化的跨 Session Memory。\nknowledge:\n  - docs/notes/fable5-sdd-dialogue-reading-notes.md\nspecRefs: [session.lifecycle]\ncontract:\n  entity: memory-store\n  sourceOfTruth: sqlite-resource-memory-store\n  writes:\n    - { actor: authenticated-human-or-api, action: create_update_delete_memory_entry, condition: explicit_write_with_audit }\n  reads:\n    - { actor: bound-session-runtime, action: load_memory_entries, condition: memory_store_id_bound_at_session_creation }\n  extraction:\n    mode: disabled\n    policy: 当前不存在 Session 到 Memory 的自动抽取；未来抽取器必须在新 Spec 中定义来源、置信度、去重、隐私与人类控制语义。\n  retention: 显式条目持续保存，直至通过认证的删除操作移除；Session 事件日志仍是独立数据源。\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/api/src/harness.ts\n    - apps/web/src/pages/Resources.tsx\n  notes:\n    - 当前 UI 支持显式 Memory 增删改查与 Session 绑定。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n  assertions:\n    - { id: no-implicit-write, assertion: 执行 Session 交互不得静默创建 Memory 条目。 }\n    - { id: explicit-binding, assertion: 只有 Session 明确绑定的 Memory Store 才能进入 Runtime 上下文。 }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -670,7 +670,7 @@
         "subjects": [
           {
             "id": "api",
-            "label": "Credential-bearing control plane"
+            "label": "持有 Credential 的控制面"
           },
           {
             "id": "worker",
@@ -678,25 +678,25 @@
           },
           {
             "id": "sandbox",
-            "label": "Ephemeral tool container"
+            "label": "临时 Tool Container"
           }
         ],
         "resources": [
           {
             "id": "vault-secrets",
-            "label": "Vault and model credentials"
+            "label": "Vault 与模型 Credential"
           },
           {
             "id": "docker-socket",
-            "label": "Host Docker socket"
+            "label": "宿主机 Docker Socket"
           },
           {
             "id": "session-workspace",
-            "label": "One Session workspace"
+            "label": "单个 Session Workspace"
           },
           {
             "id": "arbitrary-egress",
-            "label": "Unrestricted network egress"
+            "label": "不受限制的网络出口"
           }
         ],
         "grants": [
@@ -744,7 +744,7 @@
               "vault-secrets",
               "docker-socket"
             ],
-            "assertion": "No subject receives both credential access and Docker socket access."
+            "assertion": "任何主体都不能同时获得 Credential 与 Docker Socket 访问权。"
           }
         ]
       },
@@ -755,8 +755,8 @@
           "deploy/docker-compose.prod.yml"
         ],
         "notes": [
-          "Current isolation tier is Docker/runc with network none, read-only rootfs, dropped capabilities, no-new-privileges, PID/CPU/memory/runtime limits.",
-          "A gVisor or microVM driver remains a replaceable higher-isolation execution backend."
+          "当前隔离等级为 Docker/runc：禁用网络、只读 rootfs、移除 Linux Capability、启用 no-new-privileges，并限制 PID、CPU、内存和运行时间。",
+          "gVisor 或 microVM Driver 仍可作为可替换的更高隔离执行后端。"
         ]
       },
       "verification": {
@@ -768,16 +768,16 @@
         "assertions": [
           {
             "id": "worker-auth",
-            "assertion": "Unauthenticated Worker requests are rejected."
+            "assertion": "未认证的 Worker 请求必须被拒绝。"
           },
           {
             "id": "path-containment",
-            "assertion": "Session IDs and workspace paths cannot escape the workspace root."
+            "assertion": "Session ID 与 Workspace 路径不得逃逸 Workspace 根目录。"
           }
         ]
       },
       "sourcePath": "spec/contracts/sandbox-boundary.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: capability-policy\nmetadata:\n  id: sandbox.boundary\n  title: Sandbox 与 Credential 隔离边界\n  status: verified\n  owners: [runtime-security]\n  tags: [sandbox, docker, containment]\nintent:\n  summary: 任何单一执行组件都不能同时拥有任意代码执行权和生产 Credential。\n  outcomes:\n    - Tool 代码只能在 Session Workspace 和明确资源上限内运行。\n    - 持有 Docker Socket 的 Worker 不能读取 Vault 或模型 Credential。\n  nonGoals:\n    - 声称 OCI Container 已提供与 microVM 等价的敌对多租户隔离。\nknowledge:\n  - docs/notes/anthropic-containment.md\nspecRefs: [session.lifecycle, credential.binding]\ncontract:\n  subjects:\n    - { id: api, label: Credential-bearing control plane }\n    - { id: worker, label: Sandbox Worker }\n    - { id: sandbox, label: Ephemeral tool container }\n  resources:\n    - { id: vault-secrets, label: Vault and model credentials }\n    - { id: docker-socket, label: Host Docker socket }\n    - { id: session-workspace, label: One Session workspace }\n    - { id: arbitrary-egress, label: Unrestricted network egress }\n  grants:\n    - { subject: api, resource: vault-secrets, access: read }\n    - { subject: api, resource: docker-socket, access: none }\n    - { subject: worker, resource: vault-secrets, access: none }\n    - { subject: worker, resource: docker-socket, access: admin }\n    - { subject: sandbox, resource: session-workspace, access: write }\n    - { subject: sandbox, resource: vault-secrets, access: none }\n    - { subject: sandbox, resource: arbitrary-egress, access: none }\n  constraints:\n    - id: split-privilege\n      type: mutually-exclusive\n      resources: [vault-secrets, docker-socket]\n      assertion: No subject receives both credential access and Docker socket access.\nimplementation:\n  code:\n    - apps/api/src/sandbox.ts\n    - apps/worker/src/app.ts\n    - deploy/docker-compose.prod.yml\n  notes:\n    - Current isolation tier is Docker/runc with network none, read-only rootfs, dropped capabilities, no-new-privileges, PID/CPU/memory/runtime limits.\n    - A gVisor or microVM driver remains a replaceable higher-isolation execution backend.\nverification:\n  tests:\n    - apps/worker/test/worker.test.ts\n    - apps/api/test/sandbox.test.ts\n    - apps/api/test/policy.test.ts\n  assertions:\n    - { id: worker-auth, assertion: Unauthenticated Worker requests are rejected. }\n    - { id: path-containment, assertion: Session IDs and workspace paths cannot escape the workspace root. }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: capability-policy\nmetadata:\n  id: sandbox.boundary\n  title: Sandbox 与 Credential 隔离边界\n  status: verified\n  owners: [runtime-security]\n  tags: [sandbox, docker, containment]\nintent:\n  summary: 任何单一执行组件都不能同时拥有任意代码执行权和生产 Credential。\n  outcomes:\n    - Tool 代码只能在 Session Workspace 和明确资源上限内运行。\n    - 持有 Docker Socket 的 Worker 不能读取 Vault 或模型 Credential。\n  nonGoals:\n    - 声称 OCI Container 已提供与 microVM 等价的敌对多租户隔离。\nknowledge:\n  - docs/notes/anthropic-containment.md\nspecRefs: [session.lifecycle, credential.binding]\ncontract:\n  subjects:\n    - { id: api, label: 持有 Credential 的控制面 }\n    - { id: worker, label: Sandbox Worker }\n    - { id: sandbox, label: 临时 Tool Container }\n  resources:\n    - { id: vault-secrets, label: Vault 与模型 Credential }\n    - { id: docker-socket, label: 宿主机 Docker Socket }\n    - { id: session-workspace, label: 单个 Session Workspace }\n    - { id: arbitrary-egress, label: 不受限制的网络出口 }\n  grants:\n    - { subject: api, resource: vault-secrets, access: read }\n    - { subject: api, resource: docker-socket, access: none }\n    - { subject: worker, resource: vault-secrets, access: none }\n    - { subject: worker, resource: docker-socket, access: admin }\n    - { subject: sandbox, resource: session-workspace, access: write }\n    - { subject: sandbox, resource: vault-secrets, access: none }\n    - { subject: sandbox, resource: arbitrary-egress, access: none }\n  constraints:\n    - id: split-privilege\n      type: mutually-exclusive\n      resources: [vault-secrets, docker-socket]\n      assertion: 任何主体都不能同时获得 Credential 与 Docker Socket 访问权。\nimplementation:\n  code:\n    - apps/api/src/sandbox.ts\n    - apps/worker/src/app.ts\n    - deploy/docker-compose.prod.yml\n  notes:\n    - 当前隔离等级为 Docker/runc：禁用网络、只读 rootfs、移除 Linux Capability、启用 no-new-privileges，并限制 PID、CPU、内存和运行时间。\n    - gVisor 或 microVM Driver 仍可作为可替换的更高隔离执行后端。\nverification:\n  tests:\n    - apps/worker/test/worker.test.ts\n    - apps/api/test/sandbox.test.ts\n    - apps/api/test/policy.test.ts\n  assertions:\n    - { id: worker-auth, assertion: 未认证的 Worker 请求必须被拒绝。 }\n    - { id: path-containment, assertion: Session ID 与 Workspace 路径不得逃逸 Workspace 根目录。 }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -818,27 +818,27 @@
         "states": [
           {
             "id": "idle",
-            "label": "Idle"
+            "label": "空闲"
           },
           {
             "id": "queued",
-            "label": "Queued"
+            "label": "已排队"
           },
           {
             "id": "running",
-            "label": "Running"
+            "label": "运行中"
           },
           {
             "id": "waiting_approval",
-            "label": "Waiting for approval"
+            "label": "等待审批"
           },
           {
             "id": "failed",
-            "label": "Failed"
+            "label": "失败"
           },
           {
             "id": "stopped",
-            "label": "Stopped",
+            "label": "已停止",
             "terminal": true
           }
         ],
@@ -913,15 +913,15 @@
         "invariants": [
           {
             "id": "one-active-job",
-            "assertion": "At most one interaction executes for the same Session."
+            "assertion": "同一 Session 同时最多执行一个 Interaction。"
           },
           {
             "id": "append-only-evidence",
-            "assertion": "Every state transition is represented by an append-only Session event."
+            "assertion": "每次状态转换都必须写入只追加的 Session 事件。"
           },
           {
             "id": "no-silent-replay",
-            "assertion": "A job that was running at restart becomes failed and is not replayed automatically."
+            "assertion": "重启时仍在运行的 Job 必须转为失败，不得自动重放。"
           }
         ]
       },
@@ -932,7 +932,7 @@
           "apps/api/src/harness.ts"
         ],
         "notes": [
-          "SQLite WAL is the current durable queue and event-store implementation."
+          "当前持久队列与事件存储由 SQLite WAL 实现。"
         ]
       },
       "verification": {
@@ -942,16 +942,16 @@
         "assertions": [
           {
             "id": "queue-restart",
-            "assertion": "A queued interaction persisted before startup is drained after restart."
+            "assertion": "启动前已持久化的排队 Interaction 会在重启后继续处理。"
           },
           {
             "id": "workspace-restart",
-            "assertion": "A Session reads the same workspace file after the API process is restarted."
+            "assertion": "API 进程重启后，Session 仍能读取同一 Workspace 文件。"
           }
         ]
       },
       "sourcePath": "spec/contracts/session-lifecycle.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: state-machine\nmetadata:\n  id: session.lifecycle\n  title: Managed Session 持久生命周期\n  status: verified\n  owners: [control-plane]\n  tags: [session, queue, recovery]\nintent:\n  summary: Session 是持久状态与证据，不等于一次模型请求或一个 Sandbox Container 的生命周期。\n  outcomes:\n    - 每个 Session 内 Interaction 串行执行，持久队列跨进程重启恢复。\n    - 被中断的副作用不会在重启后静默重放。\n  nonGoals:\n    - 在没有显式重试的情况下重建被中断的模型或 Tool Call。\nknowledge:\n  - docs/notes/anthropic-managed-agents.md\n  - docs/notes/fable5-sdd-dialogue-reading-notes.md\nspecRefs: [sandbox.boundary, agent.runtime]\ncontract:\n  initial: idle\n  states:\n    - { id: idle, label: Idle }\n    - { id: queued, label: Queued }\n    - { id: running, label: Running }\n    - { id: waiting_approval, label: Waiting for approval }\n    - { id: failed, label: Failed }\n    - { id: stopped, label: Stopped, terminal: true }\n  transitions:\n    - { from: idle, event: interaction_submitted, to: queued, effect: persist_job_and_status_event }\n    - { from: failed, event: explicit_retry, to: queued, effect: persist_new_job }\n    - { from: queued, event: worker_claimed, to: running, effect: append_running_event }\n    - { from: queued, event: user_stop, to: stopped, effect: cancel_queued_job }\n    - { from: running, event: approval_required, to: waiting_approval, effect: persist_pending_approval }\n    - { from: running, event: turn_completed, to: idle, effect: append_end_turn }\n    - { from: running, event: execution_failed, to: failed, effect: persist_error }\n    - { from: running, event: user_stop, to: stopped, effect: abort_execution }\n    - { from: waiting_approval, event: approved, to: running, effect: resume_same_call }\n    - { from: waiting_approval, event: rejected, to: failed, effect: persist_denial }\n    - { from: waiting_approval, event: control_plane_restart, to: failed, effect: require_explicit_retry }\n  invariants:\n    - { id: one-active-job, assertion: At most one interaction executes for the same Session. }\n    - { id: append-only-evidence, assertion: Every state transition is represented by an append-only Session event. }\n    - { id: no-silent-replay, assertion: A job that was running at restart becomes failed and is not replayed automatically. }\nimplementation:\n  code:\n    - apps/api/src/queue.ts\n    - apps/api/src/db.ts\n    - apps/api/src/harness.ts\n  notes:\n    - SQLite WAL is the current durable queue and event-store implementation.\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n  assertions:\n    - { id: queue-restart, assertion: A queued interaction persisted before startup is drained after restart. }\n    - { id: workspace-restart, assertion: A Session reads the same workspace file after the API process is restarted. }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: state-machine\nmetadata:\n  id: session.lifecycle\n  title: Managed Session 持久生命周期\n  status: verified\n  owners: [control-plane]\n  tags: [session, queue, recovery]\nintent:\n  summary: Session 是持久状态与证据，不等于一次模型请求或一个 Sandbox Container 的生命周期。\n  outcomes:\n    - 每个 Session 内 Interaction 串行执行，持久队列跨进程重启恢复。\n    - 被中断的副作用不会在重启后静默重放。\n  nonGoals:\n    - 在没有显式重试的情况下重建被中断的模型或 Tool Call。\nknowledge:\n  - docs/notes/anthropic-managed-agents.md\n  - docs/notes/fable5-sdd-dialogue-reading-notes.md\nspecRefs: [sandbox.boundary, agent.runtime]\ncontract:\n  initial: idle\n  states:\n    - { id: idle, label: 空闲 }\n    - { id: queued, label: 已排队 }\n    - { id: running, label: 运行中 }\n    - { id: waiting_approval, label: 等待审批 }\n    - { id: failed, label: 失败 }\n    - { id: stopped, label: 已停止, terminal: true }\n  transitions:\n    - { from: idle, event: interaction_submitted, to: queued, effect: persist_job_and_status_event }\n    - { from: failed, event: explicit_retry, to: queued, effect: persist_new_job }\n    - { from: queued, event: worker_claimed, to: running, effect: append_running_event }\n    - { from: queued, event: user_stop, to: stopped, effect: cancel_queued_job }\n    - { from: running, event: approval_required, to: waiting_approval, effect: persist_pending_approval }\n    - { from: running, event: turn_completed, to: idle, effect: append_end_turn }\n    - { from: running, event: execution_failed, to: failed, effect: persist_error }\n    - { from: running, event: user_stop, to: stopped, effect: abort_execution }\n    - { from: waiting_approval, event: approved, to: running, effect: resume_same_call }\n    - { from: waiting_approval, event: rejected, to: failed, effect: persist_denial }\n    - { from: waiting_approval, event: control_plane_restart, to: failed, effect: require_explicit_retry }\n  invariants:\n    - { id: one-active-job, assertion: 同一 Session 同时最多执行一个 Interaction。 }\n    - { id: append-only-evidence, assertion: 每次状态转换都必须写入只追加的 Session 事件。 }\n    - { id: no-silent-replay, assertion: 重启时仍在运行的 Job 必须转为失败，不得自动重放。 }\nimplementation:\n  code:\n    - apps/api/src/queue.ts\n    - apps/api/src/db.ts\n    - apps/api/src/harness.ts\n  notes:\n    - 当前持久队列与事件存储由 SQLite WAL 实现。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n  assertions:\n    - { id: queue-restart, assertion: 启动前已持久化的排队 Interaction 会在重启后继续处理。 }\n    - { id: workspace-restart, assertion: API 进程重启后，Session 仍能读取同一 Workspace 文件。 }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -1143,35 +1143,35 @@
     },
     {
       "id": "memory",
-      "label": "Explicit Memory Stores",
+      "label": "显式长期 Memory Store",
       "status": "partial",
       "evidence": "spec/contracts/memory-lifecycle.yaml",
       "specId": "control-plane.capabilities"
     },
     {
       "id": "market",
-      "label": "Git-first Market integration",
+      "label": "Git-first Market 集成",
       "status": "implemented",
       "evidence": "spec/contracts/market-integration.yaml",
       "specId": "control-plane.capabilities"
     },
     {
       "id": "sandbox",
-      "label": "Replaceable isolated execution backend",
+      "label": "可替换的隔离执行后端",
       "status": "verified",
       "evidence": "apps/worker/test/worker.test.ts",
       "specId": "control-plane.capabilities"
     },
     {
       "id": "runtime",
-      "label": "Production-grade agent SDK runtime",
+      "label": "生产级 Agent SDK Runtime",
       "status": "partial",
       "evidence": "spec/contracts/agent-runtime.yaml",
       "specId": "control-plane.capabilities"
     },
     {
       "id": "observability",
-      "label": "Audit, events and Prometheus metrics",
+      "label": "审计、事件与 Prometheus 指标",
       "status": "implemented",
       "evidence": "apps/api/src/app.ts",
       "specId": "control-plane.capabilities"

@@ -18,14 +18,14 @@ knowledge:
 specRefs: [session.lifecycle, credential.binding]
 contract:
   subjects:
-    - { id: api, label: Credential-bearing control plane }
+    - { id: api, label: 持有 Credential 的控制面 }
     - { id: worker, label: Sandbox Worker }
-    - { id: sandbox, label: Ephemeral tool container }
+    - { id: sandbox, label: 临时 Tool Container }
   resources:
-    - { id: vault-secrets, label: Vault and model credentials }
-    - { id: docker-socket, label: Host Docker socket }
-    - { id: session-workspace, label: One Session workspace }
-    - { id: arbitrary-egress, label: Unrestricted network egress }
+    - { id: vault-secrets, label: Vault 与模型 Credential }
+    - { id: docker-socket, label: 宿主机 Docker Socket }
+    - { id: session-workspace, label: 单个 Session Workspace }
+    - { id: arbitrary-egress, label: 不受限制的网络出口 }
   grants:
     - { subject: api, resource: vault-secrets, access: read }
     - { subject: api, resource: docker-socket, access: none }
@@ -38,20 +38,20 @@ contract:
     - id: split-privilege
       type: mutually-exclusive
       resources: [vault-secrets, docker-socket]
-      assertion: No subject receives both credential access and Docker socket access.
+      assertion: 任何主体都不能同时获得 Credential 与 Docker Socket 访问权。
 implementation:
   code:
     - apps/api/src/sandbox.ts
     - apps/worker/src/app.ts
     - deploy/docker-compose.prod.yml
   notes:
-    - Current isolation tier is Docker/runc with network none, read-only rootfs, dropped capabilities, no-new-privileges, PID/CPU/memory/runtime limits.
-    - A gVisor or microVM driver remains a replaceable higher-isolation execution backend.
+    - 当前隔离等级为 Docker/runc：禁用网络、只读 rootfs、移除 Linux Capability、启用 no-new-privileges，并限制 PID、CPU、内存和运行时间。
+    - gVisor 或 microVM Driver 仍可作为可替换的更高隔离执行后端。
 verification:
   tests:
     - apps/worker/test/worker.test.ts
     - apps/api/test/sandbox.test.ts
     - apps/api/test/policy.test.ts
   assertions:
-    - { id: worker-auth, assertion: Unauthenticated Worker requests are rejected. }
-    - { id: path-containment, assertion: Session IDs and workspace paths cannot escape the workspace root. }
+    - { id: worker-auth, assertion: 未认证的 Worker 请求必须被拒绝。 }
+    - { id: path-containment, assertion: Session ID 与 Workspace 路径不得逃逸 Workspace 根目录。 }

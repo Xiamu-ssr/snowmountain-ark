@@ -21,22 +21,22 @@ contract:
   provider: snowmountain-market
   sourceOfTruth: git-repository
   endpoints:
-    - { id: catalog, purpose: Capability discovery and immutable artifact metadata, visibility: internal }
-    - { id: public-viewer, purpose: Human browsing and installation guidance, visibility: public }
+    - { id: catalog, purpose: 能力发现与不可变制品元数据, visibility: internal }
+    - { id: public-viewer, purpose: 人类浏览与安装指导, visibility: public }
   health:
     timeoutMs: 5000
     success: HTTP 2xx with snowmountain-market-catalog/v2、sources、分类信息和 items 数组
-  fallback: Serve the same Git-built static catalog from an independently deployed local Market container; never synthesize an empty catalog as healthy.
+  fallback: 由独立部署的本地 Market Container 提供同一份 Git 构建静态目录；绝不能把伪造的空目录报告为健康。
 implementation:
   code:
     - apps/api/src/app.ts
     - apps/web/src/pages/Market.tsx
     - deploy/docker-compose.prod.yml
   notes:
-    - Production uses an internal Market service because the current Alibaba host cannot establish TLS to GitHub Pages.
+    - 当前阿里云主机无法与 GitHub Pages 建立 TLS 连接，因此生产环境使用内部 Market 服务。
 verification:
   tests:
     - apps/api/test/api.test.ts
   assertions:
-    - { id: catalog-shape, assertion: A reachable Market response declares the expected format and returns capability items. }
-    - { id: visible-failure, assertion: "An unreachable Market is rendered as unavailable with its endpoint and reason, never as not-yet-started." }
+    - { id: catalog-shape, assertion: 可达的 Market 响应必须声明预期格式并返回能力条目。 }
+    - { id: visible-failure, assertion: "Market 不可达时必须显示 Endpoint 与原因，不能伪装成‘尚未启动’。" }
