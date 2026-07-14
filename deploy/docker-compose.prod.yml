@@ -1,0 +1,102 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    env_file: .env.production
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4310
+      DATA_DIR: /app/data
+      SANDBOX_DRIVER: remote
+      SANDBOX_WORKER_URL: http://worker:4312
+      SANDBOX_WORKER_TOKEN: ${SANDBOX_WORKER_TOKEN}
+      SANDBOX_IMAGE: ${SANDBOX_IMAGE:-alpine:3.20}
+      MARKET_INDEX_URL: https://xiamu-ssr.github.io/snowmountain-market/api/catalog.json
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      AUTH_COOKIE_SECURE: "true"
+      AUTH_COOKIE_PATH: /ark
+      AUTH_SESSION_HOURS: ${AUTH_SESSION_HOURS:-24}
+      VAULT_MASTER_KEY: ${VAULT_MASTER_KEY}
+      MODEL_API_KEY: ${MODEL_API_KEY:-}
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      worker:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4310/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    env_file: .env.production
+    environment:
+      WORKER_HOST: 0.0.0.0
+      WORKER_PORT: 4312
+      WORKER_DATA_DIR: /data
+      SANDBOX_WORKER_TOKEN: ${SANDBOX_WORKER_TOKEN}
+      SANDBOX_IMAGE: ${SANDBOX_IMAGE:-alpine:3.20}
+      SANDBOX_HOST_DATA_DIR: ${ARK_HOST_DATA_DIR}
+    volumes:
+      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid
+      - /root:size=8m,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4312/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_BASE_PATH: /ark/
+        VITE_API_URL: /ark
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:4311:80
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m,noexec,nosuid
+      - /var/run:size=4m,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10

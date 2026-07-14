@@ -95,6 +95,8 @@ export interface Credential extends BaseResource {
   mcpServerName?: string | undefined;
   clientId?: string | undefined;
   clientSecretCiphertext?: string | undefined;
+  tokenUrl?: string | undefined;
+  scopes?: string[] | undefined;
   expiresAt?: string | undefined;
   validationStatus?: "unvalidated" | "valid" | "invalid" | undefined;
   lastValidatedAt?: string | undefined;
@@ -114,7 +116,7 @@ export interface MemoryStore extends BaseResource {
   memories: MemoryEntry[];
 }
 
-export type SessionStatus = "idle" | "running" | "waiting_approval" | "failed" | "stopped";
+export type SessionStatus = "idle" | "queued" | "running" | "waiting_approval" | "failed" | "stopped";
 
 export interface SessionResourceConfig {
   cpu: number;
@@ -176,6 +178,19 @@ export interface SessionEvent<T = unknown> {
   createdAt: string;
 }
 
+export type InteractionJobStatus = "queued" | "running" | "completed" | "failed";
+
+export interface InteractionJob {
+  id: string;
+  sessionId: string;
+  content: string;
+  status: InteractionJobStatus;
+  attempts: number;
+  error?: string | undefined;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ToolCall {
   id: string;
   name: string;
@@ -228,6 +243,26 @@ export interface MonitoringSummary {
   cacheWriteTokens: number;
   toolCalls: number;
   modelRequests: number;
+}
+
+export interface AuditEvent {
+  id: string;
+  actor: string;
+  action: string;
+  target: string;
+  method: string;
+  statusCode: number;
+  ip: string;
+  requestId: string;
+  createdAt: string;
+}
+
+export interface AuthStatus {
+  enabled: boolean;
+  authenticated: boolean;
+  user?: string | undefined;
+  csrfToken?: string | undefined;
+  expiresAt?: string | undefined;
 }
 
 export type ManagedResource =

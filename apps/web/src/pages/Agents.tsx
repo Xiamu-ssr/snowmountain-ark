@@ -217,7 +217,7 @@ export function AgentDetailPage() {
   const [tab, setTab] = useState<"base" | "sessions" | "model" | "monitor">("base");
   const [error, setError] = useState("");
   useEffect(() => {
-    Promise.all([api.get<Agent>("agents", id), api.list<Session>("sessions"), fetch(`/v1/agents/${id}/versions`).then((response) => response.json())])
+    Promise.all([api.get<Agent>("agents", id), api.list<Session>("sessions"), api.agentVersions(id)])
       .then(([agentData, sessionData, versionData]) => { setAgent(agentData); setSessions(sessionData.items.filter((item) => item.agentId === id)); setVersions(versionData.items as Agent[]); })
       .catch((reason: Error) => setError(reason.message));
   }, [id]);

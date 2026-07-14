@@ -3,6 +3,7 @@ import {
   KeyRound, Layers3, Library, MountainSnow, Search, Settings, Store, Workflow
 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
+import { api } from "../api";
 
 const nav = [
   { to: "/agents", label: "Agents", icon: Bot },
@@ -17,6 +18,7 @@ const nav = [
 ];
 
 export function Shell() {
+  const logout = async () => { await api.logout(); window.location.reload(); };
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -30,7 +32,7 @@ export function Shell() {
         <div className="top-actions">
           <button className="icon-button" aria-label="知识库"><Library size={18} /></button>
           <button className="icon-button" aria-label="帮助"><CircleHelp size={18} /></button>
-          <button className="account"><Fingerprint size={17} /><span>本地组织</span><ChevronDown size={14} /></button>
+          <button className="account" onClick={() => void logout()} title="退出登录"><Fingerprint size={17} /><span>管理账号</span><ChevronDown size={14} /></button>
         </div>
       </header>
       <aside className="sidebar">

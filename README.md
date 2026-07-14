@@ -13,8 +13,11 @@
 - Agent 版本、模型、System Prompt、Skills、Tools、Multi Agents、MCPs 与工具级权限；
 - Session、Environment、Credentials Vault、Memory Store 与依赖删除保护；
 - SQLite 追加事件日志，逐项记录 User、Thinking、模型请求/Tokens、Policy、Approval、Tool/MCP/Subagent、Assistant 与状态；
+- SQLite 持久 Interaction Queue：排队任务跨进程重启保留，运行中断会显式失败并可重试；
 - 同一 Session 跨任务持久的 `/workspace`；
-- 本地开发 Sandbox 和 Docker 硬隔离驱动；
+- 本地开发 Sandbox、Docker 硬隔离和独立的远程 Sandbox Worker；
+- 登录 Session、HttpOnly Cookie、CSRF、防爆破限流和写操作审计；
+- AES-256-GCM Credential Vault，以及 OAuth Client Credentials 自动换取/刷新；
 - OpenAI-compatible 模型端点与本地确定性 Harness；
 - 雪山 Market catalog 对接；
 - React 人类控制台、预览/调试事件工作台、结构化 Inspector、API 接入、SDD 对齐页和依赖图。
@@ -23,19 +26,21 @@
 
 ```mermaid
 flowchart LR
-    UI[React Control Plane] --> API[Fastify Agents API]
-    API --> DB[(SQLite Event Log)]
-    API --> H[Stateless Harness]
-    H <--> DB
+    UI[React Human Control Plane] --> API[Fastify API]
+    API --> DB[(SQLite Resources / Queue / Events / Audit)]
+    API --> Q[Durable Interaction Queue]
+    Q --> H[Replaceable Harness]
     H --> P[Policy Engine]
-    P --> X[Execution Target]
-    X --> S[Local / Docker Sandbox]
-    X --> TP[Tool & MCP Proxy]
-    TP --> V[Encrypted Vault]
-    M[Snowmountain Market] --> API
+    H --> MP[MCP and Credential Proxy]
+    MP --> V[Encrypted Vault]
+    H --> RW[Authenticated Remote Worker]
+    RW --> S[Ephemeral Docker Sandbox]
+    M[Snowmountain Market Catalog] --> API
 ```
 
 核心原则是：Session 是持久事件与状态，不是某个容器或模型上下文；Harness 和 Sandbox 都可以独立失败、恢复和替换。
+
+生产拓扑刻意隔离两类高权限：API 持有 Vault/模型凭证但没有 Docker Socket；Worker 持有 Docker Socket 但没有 Vault/模型凭证。两者只通过随机共享 Token 的内部 HTTP 接口通信。
 
 ## 本地运行
 
@@ -109,10 +114,15 @@ Harness 支持标准 Chat Completions tool call 循环。生产版应把模型 C
 - `GET/POST/DELETE /v1/api-keys`
 - `GET /v1/monitoring/summary`
 - `GET /v1/settings`
+- `GET /v1/audit`
+- `GET /v1/auth/status`
+- `POST /v1/auth/login`
+- `POST /v1/auth/logout`
 
 数据面：
 
 - `POST /v1/sessions/:id/interactions`
+- `GET /v1/interaction-jobs/:id`
 - `GET /v1/sessions/:id/events?after=N`
 - `GET /v1/sessions/:id/events/stream`（SSE）
 - `POST /v1/sessions/:id/approvals/:approvalId`
@@ -148,3 +158,5 @@ docker compose up --build
 ```
 
 Compose 便于演示控制面，默认仍使用本地执行驱动。生产运行不可信代码时，应把 Sandbox Worker 独立部署到容器平台或 microVM，不要把宿主机 Docker socket 直接暴露给 API 服务。
+
+生产部署使用 [`deploy/docker-compose.prod.yml`](./deploy/docker-compose.prod.yml)：API 与 Worker 分离、只公开 loopback Web 端口，再由宿主 Nginx 提供 HTTPS `/ark/`。完整运维步骤、IP 短证书自动续期、备份与恢复见 [`deploy/README.md`](./deploy/README.md)。

@@ -6,6 +6,7 @@ import { z } from "zod";
 import type {
   Agent,
   ApiKey,
+  AuditEvent,
   Credential,
   DependencyEdge,
   Environment,
@@ -19,9 +20,12 @@ import type {
 } from "@snowmountain/contracts";
 import { defaultToolPolicies } from "@snowmountain/contracts";
 import { config } from "./config.js";
+import { AuthManager, LoginRateLimitError } from "./auth.js";
 import { Store } from "./db.js";
 import { Harness } from "./harness.js";
 import { createId } from "./ids.js";
+import { fetchClientCredentialsToken } from "./mcp.js";
+import { InteractionQueue } from "./queue.js";
 import { Sandbox } from "./sandbox.js";
 import { sealSecret } from "./vault.js";
 
@@ -30,6 +34,13 @@ export interface AppOptions {
   dataDir?: string;
   logger?: boolean;
   seed?: boolean;
+  auth?: {
+    username: string;
+    password: string;
+    cookieSecure?: boolean;
+    cookiePath?: string;
+    sessionHours?: number;
+  };
 }
 
 const baseInput = z.object({
@@ -178,12 +189,102 @@ function seedStore(store: Store): void {
 
 export async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false });
-  await app.register(cors, { origin: true });
+  const authOptions = {
+    username: options.auth?.username ?? config.adminUsername,
+    password: options.auth?.password ?? config.adminPassword,
+    sessionHours: options.auth?.sessionHours ?? config.authSessionHours,
+    cookieSecure: options.auth?.cookieSecure ?? config.authCookieSecure,
+    cookiePath: options.auth?.cookiePath ?? config.authCookiePath
+  };
+  await app.register(cors, { origin: authOptions.password ? false : true, credentials: true });
   const store = new Store(options.databasePath ?? resolve(config.dataDir, "snowmountain.db"));
   if (options.seed ?? true) seedStore(store);
-  const sandbox = new Sandbox({ dataDir: options.dataDir ?? config.dataDir, driver: config.sandboxDriver, image: config.sandboxImage });
+  store.recoverInterruptedSessions();
+  const sandbox = new Sandbox({
+    dataDir: options.dataDir ?? config.dataDir,
+    driver: config.sandboxDriver,
+    image: config.sandboxImage,
+    workerUrl: config.sandboxWorkerUrl,
+    workerToken: config.sandboxWorkerToken,
+    hostDataDir: config.sandboxHostDataDir
+  });
   const harness = new Harness(store, sandbox);
-  app.addHook("onClose", () => store.close());
+  const queue = new InteractionQueue(store, harness, 4, (error) => app.log.error(error));
+  const auth = new AuthManager(store, {
+    ...authOptions
+  });
+  const actors = new WeakMap<object, string>();
+  app.addHook("onClose", () => { queue.close(); store.close(); });
+  queue.start();
+
+  app.addHook("onRequest", async (request, reply) => {
+    const path = request.url.split("?", 1)[0] ?? request.url;
+    if (!auth.enabled) {
+      actors.set(request, "local-admin");
+      return;
+    }
+    if (path === "/v1/auth/status" || path === "/v1/auth/login" || !path.startsWith("/v1/")) return;
+    const session = auth.session(request);
+    if (!session) {
+      await reply.code(401).send({ error: "authentication_required" });
+      return;
+    }
+    actors.set(request, session.username);
+    if (!["GET", "HEAD", "OPTIONS"].includes(request.method) && !auth.verifyCsrf(request, session)) {
+      await reply.code(403).send({ error: "invalid_csrf_token" });
+    }
+  });
+
+  app.addHook("onResponse", async (request, reply) => {
+    if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return;
+    const target = request.url.split("?", 1)[0] ?? request.url;
+    store.appendAudit({
+      actor: actors.get(request) ?? "anonymous",
+      action: `${request.method} ${target}`,
+      target,
+      method: request.method,
+      status_code: reply.statusCode,
+      ip: request.ip,
+      request_id: request.id
+    });
+  });
+
+  app.get("/v1/auth/status", async (request) => auth.status(request));
+
+  app.post("/v1/auth/login", async (request, reply) => {
+    const parsed = z.object({ username: z.string().min(1).max(120), password: z.string().min(1).max(1000) }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_login" });
+    try {
+      const result = auth.login(parsed.data.username, parsed.data.password, request.ip);
+      if (!result) return reply.code(401).send({ error: "invalid_login" });
+      actors.set(request, parsed.data.username);
+      reply.header("set-cookie", auth.loginCookies(result));
+      return { enabled: true, authenticated: true, user: parsed.data.username, expiresAt: result.expiresAt };
+    } catch (error) {
+      if (error instanceof LoginRateLimitError) return reply.code(429).send({ error: "login_rate_limited" });
+      throw error;
+    }
+  });
+
+  app.post("/v1/auth/logout", async (request, reply) => {
+    auth.logout(request);
+    reply.header("set-cookie", auth.clearCookies());
+    return { authenticated: false };
+  });
+
+  app.get<{ Querystring: { limit?: string } }>("/v1/audit", async (request): Promise<{ items: AuditEvent[] }> => ({
+    items: store.listAudit(Number(request.query.limit ?? 200)).map((row) => ({
+      id: row.id,
+      actor: row.actor,
+      action: row.action,
+      target: row.target,
+      method: row.method,
+      statusCode: row.status_code,
+      ip: row.ip,
+      requestId: row.request_id,
+      createdAt: row.created_at
+    }))
+  }));
 
   const requireApiKey = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const authorization = request.headers.authorization ?? "";
@@ -194,6 +295,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       await reply.code(401).send({ error: "invalid_api_key" });
       return;
     }
+    actors.set(request, `api-key:${apiKey.id}`);
     store.update<ApiKey>(apiKey.id, { lastUsedAt: new Date().toISOString() });
   };
 
@@ -348,21 +450,33 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     const parsed = z.object({
       serverUrl: z.string().url(),
       authType: z.enum(["bearer", "oauth"]),
-      secret: z.string().optional()
+      secret: z.string().optional(),
+      tokenUrl: z.string().url().optional(),
+      clientId: z.string().optional(),
+      clientSecret: z.string().optional(),
+      scopes: z.array(z.string()).optional()
     }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     try {
+      const token = parsed.data.authType === "oauth" && parsed.data.tokenUrl && parsed.data.clientId && parsed.data.clientSecret
+        ? (await fetchClientCredentialsToken({
+            tokenUrl: parsed.data.tokenUrl,
+            clientId: parsed.data.clientId,
+            clientSecret: parsed.data.clientSecret,
+            ...(parsed.data.scopes ? { scopes: parsed.data.scopes } : {})
+          })).accessToken
+        : parsed.data.secret;
       const response = await fetch(parsed.data.serverUrl, {
         method: "POST",
         headers: {
           "content-type": "application/json",
           accept: "application/json, text/event-stream",
-          ...(parsed.data.secret ? { authorization: `Bearer ${parsed.data.secret}` } : {})
+          ...(token ? { authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ jsonrpc: "2.0", id: "snowmountain-validation", method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "snowmountain-ark", version: "0.2.0" } } }),
         signal: AbortSignal.timeout(10_000)
       });
-      return { valid: response.status < 500, status: response.status, checkedAt: new Date().toISOString() };
+      return { valid: response.ok, status: response.status, checkedAt: new Date().toISOString() };
     } catch (error) {
       return reply.code(422).send({ valid: false, error: error instanceof Error ? error.message : String(error) });
     }
@@ -372,7 +486,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     const parsed = baseInput.extend({
       vaultId: z.string(), serverUrl: z.string().url(), authType: z.enum(["bearer", "oauth"]),
       secret: z.string().optional().default(""), mcpServerId: z.string().optional(), mcpServerName: z.string().optional(),
-      clientId: z.string().optional(), clientSecret: z.string().optional(), expiresAt: z.string().datetime().optional(),
+      clientId: z.string().optional(), clientSecret: z.string().optional(), tokenUrl: z.string().url().optional(),
+      scopes: z.array(z.string()).optional(), expiresAt: z.string().datetime().optional(),
       validated: z.boolean().optional().default(false)
     }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
@@ -384,6 +499,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       mcpServerId: parsed.data.mcpServerId, mcpServerName: parsed.data.mcpServerName,
       clientId: parsed.data.clientId,
       clientSecretCiphertext: parsed.data.clientSecret ? sealSecret(parsed.data.clientSecret) : undefined,
+      tokenUrl: parsed.data.tokenUrl,
+      scopes: parsed.data.scopes,
       expiresAt: parsed.data.expiresAt,
       validationStatus: parsed.data.validated ? "valid" : "unvalidated",
       lastValidatedAt: parsed.data.validated ? new Date().toISOString() : undefined
@@ -509,14 +626,18 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const session = store.get<Session>(request.params.id);
     if (!session) return reply.code(404).send({ error: "not_found" });
-    if (session.status === "running" || session.status === "waiting_approval") return reply.code(409).send({ error: "session_running" });
-    const run = harness.run(session.id, parsed.data.content);
+    if (["queued", "running", "waiting_approval"].includes(session.status)) return reply.code(409).send({ error: "session_running" });
+    const job = queue.enqueue(session.id, parsed.data.content);
     if (parsed.data.wait) {
-      await run;
-      return { accepted: true, status: store.get<Session>(session.id)?.status };
+      await queue.wait(job.id);
+      return { accepted: true, jobId: job.id, status: store.get<Session>(session.id)?.status };
     }
-    void run.catch((error) => app.log.error(error));
-    return reply.code(202).send({ accepted: true, sessionId: session.id });
+    return reply.code(202).send({ accepted: true, sessionId: session.id, jobId: job.id });
+  });
+
+  app.get<{ Params: { id: string } }>("/v1/interaction-jobs/:id", async (request, reply) => {
+    const job = store.getInteractionJob(request.params.id);
+    return job ? job : reply.code(404).send({ error: "not_found" });
   });
 
   app.post<{ Params: { id: string; approvalId: string } }>("/v1/sessions/:id/approvals/:approvalId", async (request, reply) => {
@@ -527,7 +648,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   });
 
   app.post<{ Params: { id: string } }>("/v1/sessions/:id/stop", async (request, reply) => {
-    return harness.stop(request.params.id) ? { stopped: true } : reply.code(409).send({ error: "session_not_running" });
+    return queue.stop(request.params.id) ? { stopped: true } : reply.code(409).send({ error: "session_not_running" });
   });
 
   app.post<{ Params: { id: string } }>("/api/v1/sessions/:id/interactions", { preHandler: requireApiKey }, async (request, reply) => {
@@ -535,14 +656,13 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const session = store.get<Session>(request.params.id);
     if (!session) return reply.code(404).send({ error: "not_found" });
-    if (["running", "waiting_approval"].includes(session.status)) return reply.code(409).send({ error: "session_running" });
-    const run = harness.run(session.id, parsed.data.content);
+    if (["queued", "running", "waiting_approval"].includes(session.status)) return reply.code(409).send({ error: "session_running" });
+    const job = queue.enqueue(session.id, parsed.data.content);
     if (parsed.data.wait) {
-      await run;
-      return { accepted: true, status: store.get<Session>(session.id)?.status };
+      await queue.wait(job.id);
+      return { accepted: true, jobId: job.id, status: store.get<Session>(session.id)?.status };
     }
-    void run.catch((error) => app.log.error(error));
-    return reply.code(202).send({ accepted: true, sessionId: session.id });
+    return reply.code(202).send({ accepted: true, sessionId: session.id, jobId: job.id });
   });
 
   app.get<{ Params: { id: string }; Querystring: { after?: string } }>("/api/v1/sessions/:id/events", { preHandler: requireApiKey }, async (request, reply) => {
@@ -573,7 +693,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     const lines = [
       "# HELP snowmountain_sessions_total Managed sessions by current state.",
       "# TYPE snowmountain_sessions_total gauge",
-      ...(["idle", "running", "waiting_approval", "failed", "stopped"] as const).map((status) => `snowmountain_sessions_total{status=\"${status}\"} ${sessions.filter((session) => session.status === status).length}`),
+      ...(["idle", "queued", "running", "waiting_approval", "failed", "stopped"] as const).map((status) => `snowmountain_sessions_total{status=\"${status}\"} ${sessions.filter((session) => session.status === status).length}`),
       "# HELP snowmountain_tokens_total Model tokens recorded by direction.",
       "# TYPE snowmountain_tokens_total counter",
       `snowmountain_tokens_total{direction=\"input\"} ${sessions.reduce((sum, session) => sum + session.inputTokens, 0)}`,
@@ -592,6 +712,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     mode: "single-tenant",
     sandboxDriver: config.sandboxDriver,
     sandboxImage: config.sandboxImage,
+    sandboxWorker: config.sandboxDriver === "remote" ? config.sandboxWorkerUrl : undefined,
     marketIndexUrl: config.marketIndexUrl,
     modelCredentialConfigured: Boolean(process.env.MODEL_API_KEY),
     vaultMasterKeyConfigured: Boolean(process.env.VAULT_MASTER_KEY),

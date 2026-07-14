@@ -10,7 +10,7 @@
     "dev:web": "pnpm --filter @snowmountain/web dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @snowmountain/api test",
+    "test": "pnpm --filter @snowmountain/api --filter @snowmountain/worker test",
     "format:conversation": "node scripts/format-conversation.mjs"
   },
   "devDependencies": {

@@ -111,11 +111,20 @@ export function VaultDetailPage() {
   const [validated, setValidated] = useState(false);
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", description: "", serverUrl: "", mcpServerName: "", authType: "bearer" as Credential["authType"], secret: "", clientId: "", clientSecret: "" });
+  const [form, setForm] = useState({ name: "", description: "", serverUrl: "", mcpServerName: "", authType: "bearer" as Credential["authType"], secret: "", clientId: "", clientSecret: "", tokenUrl: "", scopeText: "" });
   const load = useCallback(() => Promise.all([api.get<Vault>("vaults", id), api.list<Credential>("credentials")]).then(([nextVault, result]) => { setVault(nextVault); setCredentials(result.items.filter((item) => item.vaultId === id)); }).catch((reason: Error) => setError(reason.message)), [id]);
   useEffect(() => { void load(); }, [load]);
-  const validate = async () => { setValidating(true); setError(""); try { const result = await api.validateCredential({ serverUrl: form.serverUrl, authType: form.authType, secret: form.secret }); setValidated(result.valid); if (!result.valid) setError("MCP Server 未通过校验"); } catch (reason) { setValidated(false); setError(reason instanceof Error ? reason.message : String(reason)); } finally { setValidating(false); } };
-  const create = async () => { try { await api.create("credentials", { ...form, vaultId: id, validated, mcpServerId: form.mcpServerName.toLowerCase().replace(/\s+/g, "-") }); setOpen(false); setValidated(false); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); } };
+  const credentialPayload = () => ({
+    name: form.name, description: form.description, serverUrl: form.serverUrl,
+    mcpServerName: form.mcpServerName, authType: form.authType, secret: form.secret,
+    vaultId: id, mcpServerId: form.mcpServerName.toLowerCase().replace(/\s+/g, "-"),
+    ...(form.authType === "oauth" ? {
+      tokenUrl: form.tokenUrl, clientId: form.clientId, clientSecret: form.clientSecret,
+      scopes: form.scopeText.split(/\s+/).filter(Boolean)
+    } : {})
+  });
+  const validate = async () => { setValidating(true); setError(""); try { const result = await api.validateCredential(credentialPayload()); setValidated(result.valid); if (!result.valid) setError("MCP Server 未通过校验"); } catch (reason) { setValidated(false); setError(reason instanceof Error ? reason.message : String(reason)); } finally { setValidating(false); } };
+  const create = async () => { try { await api.create("credentials", { ...credentialPayload(), validated }); setOpen(false); setValidated(false); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); } };
   const remove = async (credentialId: string) => { try { await api.remove("credentials", credentialId); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); } };
   if (error && !vault) return <div className="page"><ErrorBanner error={error} /></div>;
   if (!vault) return <Loading />;
@@ -127,7 +136,7 @@ export function VaultDetailPage() {
       <label>MCP Server URL<input value={form.serverUrl} onChange={(event) => { setForm({ ...form, serverUrl: event.target.value }); setValidated(false); }} placeholder="https://mcp.example.com/mcp" /></label>
       <div className="mode-toggle credential-auth"><button className={form.authType === "bearer" ? "active" : ""} onClick={() => { setForm({ ...form, authType: "bearer" }); setValidated(false); }}>Bearer Token</button><button className={form.authType === "oauth" ? "active" : ""} onClick={() => { setForm({ ...form, authType: "oauth" }); setValidated(false); }}>OAuth</button></div>
       <label>{form.authType === "bearer" ? "Token" : "Access token（可选）"}<input type="password" value={form.secret} onChange={(event) => { setForm({ ...form, secret: event.target.value }); setValidated(false); }} /></label>
-      {form.authType === "oauth" && <div className="form-grid two"><label>Client ID<input value={form.clientId} onChange={(event) => setForm({ ...form, clientId: event.target.value })} /></label><label>Client secret<input type="password" value={form.clientSecret} onChange={(event) => setForm({ ...form, clientSecret: event.target.value })} /></label></div>}
+      {form.authType === "oauth" && <><label>Token URL<input value={form.tokenUrl} onChange={(event) => { setForm({ ...form, tokenUrl: event.target.value }); setValidated(false); }} placeholder="https://auth.example.com/oauth/token" /></label><div className="form-grid two"><label>Client ID<input value={form.clientId} onChange={(event) => { setForm({ ...form, clientId: event.target.value }); setValidated(false); }} /></label><label>Client secret<input type="password" value={form.clientSecret} onChange={(event) => { setForm({ ...form, clientSecret: event.target.value }); setValidated(false); }} /></label></div><label>Scopes（空格分隔）<input value={form.scopeText} onChange={(event) => { setForm({ ...form, scopeText: event.target.value }); setValidated(false); }} placeholder="mcp.read mcp.execute" /></label></>}
     </Modal>
   </div>;
 }

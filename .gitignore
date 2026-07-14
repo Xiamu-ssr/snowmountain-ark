@@ -10,3 +10,6 @@ apps/web/playwright-report/
 apps/web/test-results/
 coverage/
 *.log
+deploy/.env.production
+deploy/data/
+deploy/backups/

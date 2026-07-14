@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { AuthGate } from "./components/Auth";
 import { Shell } from "./components/Shell";
 import { AgentCreatePage, AgentDetailPage, AgentEditPage, AgentsPage } from "./pages/Agents";
 import { DependenciesPage } from "./pages/Dependencies";
@@ -9,7 +10,7 @@ import { SessionDetailPage, SessionsPage } from "./pages/Sessions";
 import { SettingsPage } from "./pages/Settings";
 
 export function App() {
-  return <Routes>
+  return <AuthGate><Routes>
     <Route element={<Shell />}>
       <Route index element={<Navigate to="/agents" replace />} />
       <Route path="agents" element={<AgentsPage />} />
@@ -30,5 +31,5 @@ export function App() {
       <Route path="settings" element={<SettingsPage />} />
       <Route path="*" element={<Navigate to="/agents" replace />} />
     </Route>
-  </Routes>;
+  </Routes></AuthGate>;
 }

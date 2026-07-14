@@ -1,6 +1,6 @@
 import type { Agent, Credential, McpServerBinding } from "@snowmountain/contracts";
 import { Store } from "./db.js";
-import { openSecret } from "./vault.js";
+import { openSecret, sealSecret } from "./vault.js";
 
 interface JsonRpcResponse<T> {
   jsonrpc: "2.0";
@@ -26,7 +26,45 @@ function safeName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "server";
 }
 
+interface OAuthTokenResponse {
+  access_token?: string;
+  expires_in?: number;
+  token_type?: string;
+}
+
+export async function fetchClientCredentialsToken(input: {
+  tokenUrl: string;
+  clientId: string;
+  clientSecret: string;
+  scopes?: string[];
+}): Promise<{ accessToken: string; expiresAt: string }> {
+  const body = new URLSearchParams({ grant_type: "client_credentials" });
+  if (input.scopes?.length) body.set("scope", input.scopes.join(" "));
+  const response = await fetch(input.tokenUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      accept: "application/json",
+      authorization: `Basic ${Buffer.from(`${input.clientId}:${input.clientSecret}`).toString("base64")}`
+    },
+    body,
+    signal: AbortSignal.timeout(15_000)
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`OAuth token endpoint returned ${response.status}`);
+  const payload = JSON.parse(text) as OAuthTokenResponse;
+  if (!payload.access_token) throw new Error("OAuth token endpoint returned no access_token");
+  const reportedLifetime = Number(payload.expires_in ?? 3600);
+  const lifetimeSeconds = Number.isFinite(reportedLifetime) ? Math.max(60, reportedLifetime) : 3600;
+  return {
+    accessToken: payload.access_token,
+    expiresAt: new Date(Date.now() + lifetimeSeconds * 1000).toISOString()
+  };
+}
+
 export class McpProxy {
+  private readonly refreshes = new Map<string, Promise<string>>();
+
   constructor(private readonly store: Store) {}
 
   async listTools(agent: Agent): Promise<{ tools: ExposedMcpTool[]; errors: Array<{ bindingId: string; message: string }> }> {
@@ -63,7 +101,34 @@ export class McpProxy {
     return this.rpc(tool.binding, "tools/call", { name: tool.remoteName, arguments: args });
   }
 
-  private headers(binding: McpServerBinding): Record<string, string> {
+  private async accessToken(credential: Credential): Promise<string> {
+    const current = openSecret(credential.secretCiphertext);
+    if (credential.authType === "bearer") return current;
+    if (current && current !== "oauth-pending" && (!credential.expiresAt || Date.parse(credential.expiresAt) > Date.now() + 60_000)) return current;
+    const inFlight = this.refreshes.get(credential.id);
+    if (inFlight) return inFlight;
+    if (!credential.tokenUrl || !credential.clientId || !credential.clientSecretCiphertext) {
+      throw new Error(`OAuth Credential ${credential.id} has expired and cannot refresh without token URL, client ID and client secret`);
+    }
+    const refresh = fetchClientCredentialsToken({
+      tokenUrl: credential.tokenUrl,
+      clientId: credential.clientId,
+      clientSecret: openSecret(credential.clientSecretCiphertext),
+      ...(credential.scopes ? { scopes: credential.scopes } : {})
+    }).then(({ accessToken, expiresAt }) => {
+      this.store.update<Credential>(credential.id, {
+        secretCiphertext: sealSecret(accessToken),
+        expiresAt,
+        validationStatus: "valid",
+        lastValidatedAt: new Date().toISOString()
+      });
+      return accessToken;
+    }).finally(() => this.refreshes.delete(credential.id));
+    this.refreshes.set(credential.id, refresh);
+    return refresh;
+  }
+
+  private async headers(binding: McpServerBinding): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       "content-type": "application/json",
       accept: "application/json, text/event-stream"
@@ -71,7 +136,7 @@ export class McpProxy {
     if (!binding.credentialId) return headers;
     const credential = this.store.get<Credential>(binding.credentialId);
     if (!credential) throw new Error(`Credential not found: ${binding.credentialId}`);
-    const secret = openSecret(credential.secretCiphertext);
+    const secret = await this.accessToken(credential);
     if (secret && secret !== "oauth-pending") headers.authorization = `Bearer ${secret}`;
     return headers;
   }
@@ -79,7 +144,7 @@ export class McpProxy {
   private async rpc<T>(binding: McpServerBinding, method: string, params: Record<string, unknown>): Promise<T> {
     const response = await fetch(binding.url, {
       method: "POST",
-      headers: this.headers(binding),
+      headers: await this.headers(binding),
       body: JSON.stringify({ jsonrpc: "2.0", id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, method, params }),
       signal: AbortSignal.timeout(30_000)
     });

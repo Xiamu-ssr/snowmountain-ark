@@ -1,0 +1,5 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+17 2 * * * root /opt/snowmountain-ark/deploy/backup.sh >>/var/log/snowmountain-ark-backup.log 2>&1
+31 3 * * * root /opt/snowmountain-ark/deploy/renew-certificate.sh >>/var/log/snowmountain-ark-certbot.log 2>&1

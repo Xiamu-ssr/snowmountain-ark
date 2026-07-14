@@ -123,12 +123,22 @@ export function SessionDetailPage() {
 
   useEffect(() => {
     let closed = false;
-    void Promise.all([refreshResource(), api.events(id)]).then(([, result]) => { if (!closed) setEvents(result.items); });
-    const timer = window.setInterval(() => void refreshResource(), 1500);
+    const refreshEvents = () => api.events(id).then((result) => {
+      if (!closed) setEvents((current) => {
+        const byId = new Map([...current, ...result.items].map((event) => [event.id, event]));
+        return [...byId.values()].sort((a, b) => a.sequence - b.sequence);
+      });
+    }).catch((reason: Error) => setError((current) => current || reason.message));
+    void Promise.all([refreshResource(), refreshEvents()]);
+    const timer = window.setInterval(() => { void refreshResource(); void refreshEvents(); }, 1500);
     const source = new EventSource(api.eventStreamUrl(id));
     const eventTypes = Object.keys(eventIcons) as SessionEventType[];
     const receive = (nativeEvent: Event) => {
-      const event = JSON.parse((nativeEvent as MessageEvent<string>).data) as SessionEvent;
+      const data = (nativeEvent as MessageEvent<unknown>).data;
+      if (typeof data !== "string" || !data.trim()) return;
+      let event: SessionEvent;
+      try { event = JSON.parse(data) as SessionEvent; }
+      catch { return; }
       setEvents((current) => current.some((value) => value.id === event.id) ? current : [...current, event].sort((a, b) => a.sequence - b.sequence));
       if (event.type === "status" || event.type === "approval_request" || event.type === "approval_result") void refreshResource();
     };
@@ -138,7 +148,7 @@ export function SessionDetailPage() {
   }, [id, refreshResource]);
 
   const send = async () => {
-    if (!message.trim() || ["running", "waiting_approval"].includes(session?.status ?? "")) return;
+    if (!message.trim() || ["queued", "running", "waiting_approval"].includes(session?.status ?? "")) return;
     const content = message; setMessage(""); setError("");
     try { await api.interact(id, content); await refreshResource(); } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
   };
@@ -149,7 +159,7 @@ export function SessionDetailPage() {
 
   const visibleEvents = useMemo(() => mode === "debug" ? events : events.filter((event) => !["model_request_start", "model_request_end", "policy"].includes(event.type)), [events, mode]);
   const tokenEvents = useMemo(() => events.filter((event) => event.type === "model_request_end"), [events]);
-  const busy = ["running", "waiting_approval"].includes(session?.status ?? "");
+  const busy = ["queued", "running", "waiting_approval"].includes(session?.status ?? "");
   if (error && !session) return <div className="page"><ErrorBanner error={error} /></div>;
   if (!session || !agent || !environment) return <Loading />;
 

@@ -1,5 +1,5 @@
 {
-  "name": "@snowmountain/api",
+  "name": "@snowmountain/worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,6 @@
     "test": "node --test --import tsx test/*.test.ts"
   },
   "dependencies": {
-    "@fastify/cors": "^11.0.1",
     "@snowmountain/contracts": "workspace:*",
     "fastify": "^5.3.3",
     "zod": "^3.25.67"

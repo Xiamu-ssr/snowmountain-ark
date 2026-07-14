@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import type { Agent, Session, SessionEvent } from "@snowmountain/contracts";
 import { buildApp } from "../src/app.js";
+import { Store } from "../src/db.js";
 
 test("runs a managed interaction and records an append-only evidence trail", async () => {
   const root = await mkdtemp(join(tmpdir(), "snowmountain-api-"));
@@ -115,6 +116,112 @@ test("exposes the middleware API only with a one-time API key", async () => {
     assert.equal(accepted.statusCode, 200, accepted.body);
   } finally {
     await app.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("protects the control plane with login cookies, CSRF and audit events", async () => {
+  const root = await mkdtemp(join(tmpdir(), "snowmountain-auth-"));
+  const app = await buildApp({
+    databasePath: join(root, "test.db"), dataDir: root, seed: true,
+    auth: { username: "admin", password: "correct-horse-battery-staple", cookiePath: "/" }
+  });
+  try {
+    const health = await app.inject({ method: "GET", url: "/health" });
+    assert.equal(health.statusCode, 200);
+    const anonymous = await app.inject({ method: "GET", url: "/v1/agents" });
+    assert.equal(anonymous.statusCode, 401);
+    const wrong = await app.inject({ method: "POST", url: "/v1/auth/login", payload: { username: "admin", password: "wrong" } });
+    assert.equal(wrong.statusCode, 401);
+    const login = await app.inject({ method: "POST", url: "/v1/auth/login", payload: { username: "admin", password: "correct-horse-battery-staple" } });
+    assert.equal(login.statusCode, 200, login.body);
+    const setCookieHeader = login.headers["set-cookie"];
+    const setCookies = Array.isArray(setCookieHeader) ? setCookieHeader : [String(setCookieHeader)];
+    const cookie = setCookies.map((value) => value.split(";", 1)[0]).join("; ");
+    const csrf = /sm_ark_csrf=([^;]+)/.exec(cookie)?.[1];
+    assert.ok(csrf);
+    const authenticated = await app.inject({ method: "GET", url: "/v1/agents", headers: { cookie } });
+    assert.equal(authenticated.statusCode, 200, authenticated.body);
+    const missingCsrf = await app.inject({ method: "POST", url: "/v1/vaults", headers: { cookie }, payload: { name: "blocked" } });
+    assert.equal(missingCsrf.statusCode, 403);
+    const created = await app.inject({ method: "POST", url: "/v1/vaults", headers: { cookie, "x-csrf-token": decodeURIComponent(csrf!) }, payload: { name: "audited" } });
+    assert.equal(created.statusCode, 201, created.body);
+    const audit = await app.inject({ method: "GET", url: "/v1/audit", headers: { cookie } });
+    assert.equal(audit.statusCode, 200, audit.body);
+    assert.ok(audit.json<{ items: Array<{ action: string; statusCode: number }> }>().items.some((event) => event.action === "POST /v1/vaults" && event.statusCode === 201));
+    const logout = await app.inject({ method: "POST", url: "/v1/auth/logout", headers: { cookie, "x-csrf-token": decodeURIComponent(csrf!) } });
+    assert.equal(logout.statusCode, 200, logout.body);
+    const afterLogout = await app.inject({ method: "GET", url: "/v1/agents", headers: { cookie } });
+    assert.equal(afterLogout.statusCode, 401);
+  } finally {
+    await app.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("recovers in-flight Sessions after a control-plane restart", async () => {
+  const root = await mkdtemp(join(tmpdir(), "snowmountain-recovery-"));
+  const databasePath = join(root, "test.db");
+  const first = await buildApp({ databasePath, dataDir: root, seed: true });
+  await first.close();
+
+  const store = new Store(databasePath);
+  store.update<Session>("sesn-snowmountain-demo", {
+    status: "waiting_approval",
+    pendingApproval: {
+      id: "appr-interrupted",
+      call: { id: "call-interrupted", name: "bash", input: { command: "pwd" } },
+      reason: "test",
+      createdAt: new Date().toISOString()
+    }
+  });
+  store.close();
+
+  const restarted = await buildApp({ databasePath, dataDir: root, seed: true });
+  try {
+    const recovered = (await restarted.inject({ method: "GET", url: "/v1/sessions/sesn-snowmountain-demo" })).json<Session>();
+    assert.equal(recovered.status, "failed");
+    assert.equal(recovered.pendingApproval, undefined);
+    assert.match(recovered.lastError ?? "", /control-plane restart/);
+    const events = (await restarted.inject({ method: "GET", url: "/v1/sessions/sesn-snowmountain-demo/events" })).json<{ items: SessionEvent[] }>().items;
+    assert.equal((events.at(-1)?.payload as { stopReason?: { type?: string } }).stopReason?.type, "control_plane_restart");
+
+    const retried = await restarted.inject({
+      method: "POST",
+      url: "/v1/sessions/sesn-snowmountain-demo/interactions",
+      payload: { content: "retry after restart", wait: true }
+    });
+    assert.equal(retried.statusCode, 200, retried.body);
+  } finally {
+    await restarted.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("drains a queued interaction persisted before startup", async () => {
+  const root = await mkdtemp(join(tmpdir(), "snowmountain-queue-"));
+  const databasePath = join(root, "test.db");
+  const initial = await buildApp({ databasePath, dataDir: root, seed: true });
+  await initial.close();
+
+  const store = new Store(databasePath);
+  const job = store.enqueueInteraction("sesn-snowmountain-demo", "persisted queue probe");
+  store.close();
+
+  const restarted = await buildApp({ databasePath, dataDir: root, seed: true });
+  try {
+    let session: Session | undefined;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      session = (await restarted.inject({ method: "GET", url: "/v1/sessions/sesn-snowmountain-demo" })).json<Session>();
+      if (session.status === "idle") break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(session?.status, "idle");
+    const completed = await restarted.inject({ method: "GET", url: `/v1/interaction-jobs/${job.id}` });
+    assert.equal(completed.statusCode, 200, completed.body);
+    assert.equal(completed.json().status, "completed");
+  } finally {
+    await restarted.close();
     await rm(root, { recursive: true, force: true });
   }
 });

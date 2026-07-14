@@ -3,8 +3,10 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type {
   Agent,
+  InteractionJob,
   ManagedResource,
   ResourceKind,
+  Session,
   SessionEvent,
   SessionEventType
 } from "@snowmountain/contracts";
@@ -30,6 +32,51 @@ interface EventRow {
   sequence: number;
   type: SessionEventType;
   payload: string;
+  created_at: string;
+}
+
+interface InteractionJobRow {
+  id: string;
+  session_id: string;
+  content: string;
+  status: InteractionJob["status"];
+  attempts: number;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function interactionJob(row: InteractionJobRow): InteractionJob {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    content: row.content,
+    status: row.status,
+    attempts: row.attempts,
+    ...(row.error ? { error: row.error } : {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+export interface AuthSessionRow {
+  token_hash: string;
+  username: string;
+  csrf_hash: string;
+  expires_at: string;
+  created_at: string;
+  last_seen_at: string;
+}
+
+export interface AuditRow {
+  id: string;
+  actor: string;
+  action: string;
+  target: string;
+  method: string;
+  status_code: number;
+  ip: string;
+  request_id: string;
   created_at: string;
 }
 
@@ -73,6 +120,39 @@ export class Store {
       );
       CREATE INDEX IF NOT EXISTS session_events_sequence
         ON session_events(session_id, sequence);
+      CREATE TABLE IF NOT EXISTS interaction_jobs (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        content TEXT NOT NULL,
+        status TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS interaction_jobs_status_created
+        ON interaction_jobs(status, created_at ASC);
+      CREATE TABLE IF NOT EXISTS auth_sessions (
+        token_hash TEXT PRIMARY KEY,
+        username TEXT NOT NULL,
+        csrf_hash TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS auth_sessions_expiry ON auth_sessions(expires_at);
+      CREATE TABLE IF NOT EXISTS audit_events (
+        id TEXT PRIMARY KEY,
+        actor TEXT NOT NULL,
+        action TEXT NOT NULL,
+        target TEXT NOT NULL,
+        method TEXT NOT NULL,
+        status_code INTEGER NOT NULL,
+        ip TEXT NOT NULL,
+        request_id TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS audit_events_created ON audit_events(created_at DESC);
     `);
   }
 
@@ -206,5 +286,120 @@ export class Store {
       payload: JSON.parse(row.payload) as T,
       createdAt: row.created_at
     }));
+  }
+
+  recoverInterruptedSessions(): string[] {
+    const interrupted = this.list<Session>("session")
+      .filter((session) => session.status === "running" || session.status === "waiting_approval");
+    for (const session of interrupted) {
+      const message = "Execution was interrupted by a control-plane restart; the Session can be retried safely.";
+      this.update<Session>(session.id, { status: "failed", lastError: message, pendingApproval: undefined });
+      this.appendEvent(session.id, "error", { message, reason: "control_plane_restart" });
+      this.appendEvent(session.id, "status", {
+        status: "failed",
+        threadStatus: "failed",
+        stopReason: { type: "control_plane_restart" }
+      });
+    }
+    return interrupted.map((session) => session.id);
+  }
+
+  enqueueInteraction(sessionId: string, content: string): InteractionJob {
+    const now = new Date().toISOString();
+    const job: InteractionJob = {
+      id: createId("job"), sessionId, content, status: "queued", attempts: 0,
+      createdAt: now, updatedAt: now
+    };
+    this.db.prepare("INSERT INTO interaction_jobs(id, session_id, content, status, attempts, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?)")
+      .run(job.id, sessionId, content, job.status, job.attempts, now, now);
+    this.update<Session>(sessionId, { status: "queued", lastError: "", pendingApproval: undefined });
+    this.appendEvent(sessionId, "status", { status: "queued", threadStatus: "queued", jobId: job.id });
+    return job;
+  }
+
+  getInteractionJob(id: string): InteractionJob | undefined {
+    const row = this.db.prepare("SELECT * FROM interaction_jobs WHERE id = ?").get(id) as unknown as InteractionJobRow | undefined;
+    return row ? interactionJob(row) : undefined;
+  }
+
+  claimNextInteraction(excludedSessionIds: Set<string>): InteractionJob | undefined {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const rows = this.db.prepare("SELECT * FROM interaction_jobs WHERE status = 'queued' ORDER BY created_at ASC LIMIT 100")
+        .all() as unknown as InteractionJobRow[];
+      const row = rows.find((candidate) => !excludedSessionIds.has(candidate.session_id));
+      if (!row) {
+        this.db.exec("COMMIT");
+        return undefined;
+      }
+      const now = new Date().toISOString();
+      this.db.prepare("UPDATE interaction_jobs SET status = 'running', attempts = attempts + 1, updated_at = ? WHERE id = ? AND status = 'queued'")
+        .run(now, row.id);
+      this.db.exec("COMMIT");
+      return this.getInteractionJob(row.id);
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  finishInteractionJob(id: string, status: "completed" | "failed", error?: string): InteractionJob | undefined {
+    const now = new Date().toISOString();
+    this.db.prepare("UPDATE interaction_jobs SET status = ?, error = ?, updated_at = ? WHERE id = ?")
+      .run(status, error ?? null, now, id);
+    return this.getInteractionJob(id);
+  }
+
+  cancelQueuedInteraction(sessionId: string): boolean {
+    const row = this.db.prepare("SELECT * FROM interaction_jobs WHERE session_id = ? AND status = 'queued' ORDER BY created_at ASC LIMIT 1")
+      .get(sessionId) as unknown as InteractionJobRow | undefined;
+    if (!row) return false;
+    this.finishInteractionJob(row.id, "failed", "Cancelled before execution");
+    this.update<Session>(sessionId, { status: "stopped", stoppedAt: new Date().toISOString() });
+    this.appendEvent(sessionId, "status", { status: "stopped", threadStatus: "stopped", stopReason: { type: "user_stop" }, jobId: row.id });
+    return true;
+  }
+
+  recoverInterruptedJobs(): string[] {
+    const rows = this.db.prepare("SELECT * FROM interaction_jobs WHERE status = 'running'").all() as unknown as InteractionJobRow[];
+    for (const row of rows) this.finishInteractionJob(row.id, "failed", "Interrupted by control-plane restart; submit a retry explicitly");
+    return rows.map((row) => row.id);
+  }
+
+  createAuthSession(tokenHash: string, username: string, csrfHash: string, expiresAt: string): AuthSessionRow {
+    const now = new Date().toISOString();
+    this.db.prepare("INSERT INTO auth_sessions(token_hash, username, csrf_hash, expires_at, created_at, last_seen_at) VALUES(?, ?, ?, ?, ?, ?)")
+      .run(tokenHash, username, csrfHash, expiresAt, now, now);
+    return { token_hash: tokenHash, username, csrf_hash: csrfHash, expires_at: expiresAt, created_at: now, last_seen_at: now };
+  }
+
+  getAuthSession(tokenHash: string): AuthSessionRow | undefined {
+    const row = this.db.prepare("SELECT * FROM auth_sessions WHERE token_hash = ?").get(tokenHash) as unknown as AuthSessionRow | undefined;
+    if (!row) return undefined;
+    if (Date.parse(row.expires_at) <= Date.now()) {
+      this.deleteAuthSession(tokenHash);
+      return undefined;
+    }
+    this.db.prepare("UPDATE auth_sessions SET last_seen_at = ? WHERE token_hash = ?").run(new Date().toISOString(), tokenHash);
+    return row;
+  }
+
+  deleteAuthSession(tokenHash: string): boolean {
+    return Number(this.db.prepare("DELETE FROM auth_sessions WHERE token_hash = ?").run(tokenHash).changes) > 0;
+  }
+
+  pruneAuthSessions(): void {
+    this.db.prepare("DELETE FROM auth_sessions WHERE expires_at <= ?").run(new Date().toISOString());
+  }
+
+  appendAudit(input: Omit<AuditRow, "id" | "created_at">): AuditRow {
+    const row: AuditRow = { id: createId("audit"), created_at: new Date().toISOString(), ...input };
+    this.db.prepare("INSERT INTO audit_events(id, actor, action, target, method, status_code, ip, request_id, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(row.id, row.actor, row.action, row.target, row.method, row.status_code, row.ip, row.request_id, row.created_at);
+    return row;
+  }
+
+  listAudit(limit = 200): AuditRow[] {
+    return this.db.prepare("SELECT * FROM audit_events ORDER BY created_at DESC LIMIT ?").all(Math.min(Math.max(limit, 1), 1000)) as unknown as AuditRow[];
   }
 }

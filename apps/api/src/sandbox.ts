@@ -6,17 +6,30 @@ import { promisify } from "node:util";
 import type { Environment, Session, ToolCall } from "@snowmountain/contracts";
 
 const execFileAsync = promisify(execFile);
+const validSessionId = /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/;
+
+function assertSessionId(sessionId: string): void {
+  if (!validSessionId.test(sessionId)) throw new Error("Invalid session ID");
+}
 
 export interface SandboxOptions {
   dataDir: string;
-  driver: "local" | "docker";
+  driver: "local" | "docker" | "remote";
   image: string;
+  workerUrl?: string | undefined;
+  workerToken?: string | undefined;
+  hostDataDir?: string | undefined;
 }
 
 export class Sandbox {
   constructor(private readonly options: SandboxOptions) {}
 
   async provision(sessionId: string): Promise<string> {
+    assertSessionId(sessionId);
+    if (this.options.driver === "remote") {
+      await this.remote("/v1/provision", "POST", { sessionId });
+      return "/workspace";
+    }
     const workspace = resolve(this.options.dataDir, "workspaces", sessionId);
     await mkdir(workspace, { recursive: true });
     return workspace;
@@ -46,6 +59,7 @@ export class Sandbox {
   }
 
   async execute(call: ToolCall, session: Session, environment: Environment): Promise<unknown> {
+    if (this.options.driver === "remote") return this.remote("/v1/execute", "POST", { call, session, environment });
     switch (call.name) {
       case "bash":
         return this.runCommand(session, environment, String(call.input.command ?? ""));
@@ -98,21 +112,25 @@ export class Sandbox {
     const resource = session.resourceConfig ?? { cpu: 1, memoryMiB: 512, maxRuntimeSeconds: 3600, networkMode: "deny" as const };
     const environmentArgs = environment.variables.flatMap((variable) => ["-e", `${variable.key}=${variable.value}`]);
     if (this.options.driver === "docker") {
+      const runtimeMs = Math.min(Math.max(resource.maxRuntimeSeconds, 1), 3600) * 1000;
+      const mountWorkspace = this.options.hostDataDir
+        ? resolve(this.options.hostDataDir, "workspaces", session.id)
+        : workspace;
       const { stdout, stderr } = await execFileAsync("docker", [
         "run", "--rm", "--network", "none", "--read-only",
         "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
         "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
         "--pids-limit", "128", "--memory", `${resource.memoryMiB}m`, "--cpus", String(resource.cpu),
         ...environmentArgs,
-        "-v", `${workspace}:/workspace:rw`, "-w", "/workspace",
+        "-v", `${mountWorkspace}:/workspace:rw`, "-w", "/workspace",
         this.options.image, "sh", "-lc", command
-      ], { timeout: Math.min(resource.maxRuntimeSeconds * 1000, 120_000), maxBuffer: 2_000_000 });
+      ], { timeout: runtimeMs, maxBuffer: 2_000_000 });
       return { stdout, stderr, exit_code: 0, driver: "docker" };
     }
 
     const { stdout, stderr } = await execFileAsync("/bin/sh", ["-lc", command], {
       cwd: workspace,
-      timeout: Math.min(resource.maxRuntimeSeconds * 1000, 120_000),
+      timeout: Math.min(Math.max(resource.maxRuntimeSeconds, 1), 3600) * 1000,
       maxBuffer: 2_000_000,
       env: {
         PATH: process.env.PATH ?? "/usr/bin:/bin",
@@ -133,12 +151,30 @@ export class Sandbox {
   }
 
   async inspect(sessionId: string): Promise<{ path: string; exists: boolean; bytes: number }> {
+    if (this.options.driver === "remote") return this.remote("/v1/inspect", "POST", { sessionId }) as Promise<{ path: string; exists: boolean; bytes: number }>;
     const workspace = await this.provision(sessionId);
     const info = await stat(workspace);
     return { path: "/workspace", exists: info.isDirectory(), bytes: info.size };
   }
 
   async destroy(sessionId: string): Promise<void> {
+    assertSessionId(sessionId);
+    if (this.options.driver === "remote") {
+      await this.remote("/v1/session", "DELETE", { sessionId });
+      return;
+    }
     await rm(resolve(this.options.dataDir, "workspaces", sessionId), { recursive: true, force: true });
+  }
+
+  private async remote(path: string, method: string, body: unknown): Promise<unknown> {
+    if (!this.options.workerUrl || !this.options.workerToken) throw new Error("Remote Sandbox Worker is not configured");
+    const response = await fetch(`${this.options.workerUrl.replace(/\/$/, "")}${path}`, {
+      method,
+      headers: { "content-type": "application/json", authorization: `Bearer ${this.options.workerToken}` },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(path === "/v1/execute" ? 3_610_000 : 30_000)
+    });
+    if (!response.ok) throw new Error(`Sandbox Worker returned ${response.status}: ${(await response.text()).slice(0, 500)}`);
+    return response.json();
   }
 }
