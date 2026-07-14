@@ -88,6 +88,7 @@ export interface Vault extends BaseResource {
 export interface Credential extends BaseResource {
   kind: "credential";
   vaultId: string;
+  usage?: "mcp" | "model" | "generic" | undefined;
   serverUrl: string;
   authType: "bearer" | "oauth";
   secretCiphertext: string;
@@ -210,12 +211,44 @@ export interface MarketEntry {
   description: string;
   version: string;
   tags: string[];
+  category?: string | undefined;
+  provider?: string | undefined;
+  registry?: string | undefined;
   resource: string;
   downloadUrl: string;
+  artifactUrl?: string | undefined;
   sha256?: string | undefined;
   permissions: string[];
   runtime: string;
   source: "local" | "remote";
+  verification?: string | undefined;
+  license?: string | undefined;
+  access?: string | undefined;
+  risk?: string[] | undefined;
+  popularity?: { downloads?: number; installs?: number; stars?: number } | undefined;
+}
+
+export interface MarketSource {
+  id: string;
+  name: string;
+  type: string;
+  url: string;
+  status: string;
+  itemCount: number;
+  strategy: string;
+  note: string;
+  syncedAt?: string | undefined;
+}
+
+export interface MarketCatalog {
+  format?: string;
+  items: MarketEntry[];
+  sources?: MarketSource[] | undefined;
+  summary?: { entries: number; types: Record<string, number>; categories: Record<string, number> } | undefined;
+  offline?: boolean | undefined;
+  source?: string | undefined;
+  endpoint?: string | undefined;
+  reason?: string | undefined;
 }
 
 export interface DependencyEdge {

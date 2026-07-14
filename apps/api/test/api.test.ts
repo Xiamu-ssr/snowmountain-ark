@@ -241,3 +241,75 @@ test("serves the validated YAML Spec bundle with runtime facts", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("resolves Session tools from the pinned Agent version and hides denied tools", async () => {
+  const root = await mkdtemp(join(tmpdir(), "snowmountain-tools-"));
+  const app = await buildApp({ databasePath: join(root, "test.db"), dataDir: root, seed: true });
+  try {
+    const original = await app.inject({ method: "GET", url: "/v1/sessions/sesn-snowmountain-demo/effective-tools" });
+    assert.equal(original.statusCode, 200, original.body);
+    const originalTools = original.json<{ agentVersion: number; builtin: Array<{ name: string }> }>();
+    assert.equal(originalTools.agentVersion, 1);
+    assert.ok(originalTools.builtin.some((tool) => tool.name === "web_search"));
+
+    const current = (await app.inject({ method: "GET", url: "/v1/agents/agent-snowmountain-guide" })).json<Agent>();
+    const updated = (await app.inject({
+      method: "PATCH",
+      url: "/v1/agents/agent-snowmountain-guide",
+      payload: { toolPolicies: { ...current.toolPolicies, web_search: "deny" } }
+    })).json<Agent>();
+    assert.equal(updated.version, 2);
+
+    const stillPinned = (await app.inject({ method: "GET", url: "/v1/sessions/sesn-snowmountain-demo/effective-tools" })).json<{ agentVersion: number; builtin: Array<{ name: string }> }>();
+    assert.equal(stillPinned.agentVersion, 1);
+    assert.ok(stillPinned.builtin.some((tool) => tool.name === "web_search"));
+
+    const nextSession = (await app.inject({ method: "POST", url: "/v1/sessions", payload: { name: "v2-tools", agentId: updated.id, environmentId: "env-default" } })).json<Session>();
+    const nextTools = (await app.inject({ method: "GET", url: `/v1/sessions/${nextSession.id}/effective-tools` })).json<{ agentVersion: number; builtin: Array<{ name: string }> }>();
+    assert.equal(nextTools.agentVersion, 2);
+    assert.ok(!nextTools.builtin.some((tool) => tool.name === "web_search"));
+  } finally {
+    await app.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("requires explicit Credential references and rejects Environment secrets", async () => {
+  const root = await mkdtemp(join(tmpdir(), "snowmountain-credentials-"));
+  const app = await buildApp({ databasePath: join(root, "test.db"), dataDir: root, seed: true });
+  try {
+    const environment = await app.inject({
+      method: "POST",
+      url: "/v1/environments",
+      payload: { name: "unsafe-env", variables: [{ key: "TOKEN", value: "secret", secret: true }] }
+    });
+    assert.equal(environment.statusCode, 400, environment.body);
+    assert.equal(environment.json().error, "environment_secret_not_allowed");
+
+    const vault = (await app.inject({ method: "POST", url: "/v1/vaults", payload: { name: "model-vault" } })).json<{ id: string }>();
+    const credential = (await app.inject({
+      method: "POST",
+      url: "/v1/credentials",
+      payload: { name: "model-key", vaultId: vault.id, usage: "model", serverUrl: "https://models.example.com/v1", authType: "bearer", secret: "test-secret" }
+    })).json<{ id: string }>();
+    const agent = await app.inject({
+      method: "POST",
+      url: "/v1/agents",
+      payload: { name: "explicit-model", model: { provider: "openai-compatible", name: "test-model", baseUrl: "https://models.example.com/v1", credentialId: credential.id } }
+    });
+    assert.equal(agent.statusCode, 201, agent.body);
+    const wrongUsage = await app.inject({
+      method: "POST",
+      url: "/v1/agents",
+      payload: { name: "wrong-binding", mcpServers: [{ id: "mcp", name: "MCP", url: "https://mcp.example.com/mcp", permission: "full", source: "manual", credentialId: credential.id }] }
+    });
+    assert.equal(wrongUsage.statusCode, 400, wrongUsage.body);
+    assert.equal(wrongUsage.json().error, "credential_usage_mismatch");
+    const deletion = await app.inject({ method: "DELETE", url: `/v1/credentials/${credential.id}` });
+    assert.equal(deletion.statusCode, 409, deletion.body);
+    assert.ok(deletion.json().dependents.some((edge: { source: string; relation: string }) => edge.source === agent.json().id && edge.relation === "uses-model-credential"));
+  } finally {
+    await app.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});

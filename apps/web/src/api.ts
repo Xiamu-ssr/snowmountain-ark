@@ -1,4 +1,4 @@
-import type { AuditEvent, AuthStatus, ManagedResource, MarketEntry, MonitoringSummary, SessionEvent, SpecBundle } from "@snowmountain/contracts";
+import type { AuditEvent, AuthStatus, ManagedResource, MarketCatalog, MonitoringSummary, SessionEvent, SpecBundle } from "@snowmountain/contracts";
 
 const configured = import.meta.env.VITE_API_URL as string | undefined;
 const API_BASE = configured?.replace(/\/$/, "") ?? "";
@@ -59,6 +59,9 @@ export const api = {
   events(sessionId: string, after = 0): Promise<{ items: SessionEvent[] }> {
     return request(`/v1/sessions/${sessionId}/events?after=${after}`);
   },
+  effectiveTools(sessionId: string): Promise<{ resolution: string; builtin: Array<{ name: string; description: string; permission: string }>; mcp: Array<{ name: string; permission: string; credentialBinding: string | null; discovery: string }>; subagents: Array<{ agentId: string; version?: number }> }> {
+    return request(`/v1/sessions/${sessionId}/effective-tools`);
+  },
   interact(sessionId: string, content: string): Promise<{ accepted: boolean }> {
     return request(`/v1/sessions/${sessionId}/interactions`, {
       method: "POST",
@@ -71,7 +74,7 @@ export const api = {
   stop(sessionId: string): Promise<{ stopped: boolean }> {
     return request(`/v1/sessions/${sessionId}/stop`, { method: "POST" });
   },
-  validateCredential(body: { serverUrl: string; authType: "bearer" | "oauth"; secret?: string; tokenUrl?: string; clientId?: string; clientSecret?: string; scopes?: string[] }): Promise<{ valid: boolean; status?: number; checkedAt?: string }> {
+  validateCredential(body: { serverUrl: string; usage?: "mcp" | "model" | "generic"; authType: "bearer" | "oauth"; secret?: string; tokenUrl?: string; clientId?: string; clientSecret?: string; scopes?: string[] }): Promise<{ valid: boolean; status?: number; checkedAt?: string }> {
     return request("/v1/credentials/validate", { method: "POST", body: JSON.stringify(body) });
   },
   addMemory<T>(storeId: string, body: unknown): Promise<T> {
@@ -95,7 +98,7 @@ export const api = {
   eventStreamUrl(sessionId: string, after = 0): string {
     return `${API_BASE}/v1/sessions/${sessionId}/events/stream?after=${after}`;
   },
-  market(): Promise<{ items: MarketEntry[]; offline?: boolean; source?: string; endpoint?: string; reason?: string }> {
+  market(): Promise<MarketCatalog> {
     return request("/v1/market/catalog");
   },
   dependencies(): Promise<{ edges: Array<{ source: string; target: string; relation: string }> }> {

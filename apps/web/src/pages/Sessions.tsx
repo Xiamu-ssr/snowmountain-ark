@@ -99,6 +99,7 @@ export function SessionDetailPage() {
   const [agent, setAgent] = useState<Agent>();
   const [environment, setEnvironment] = useState<Environment>();
   const [events, setEvents] = useState<SessionEvent[]>([]);
+  const [effectiveTools, setEffectiveTools] = useState<{ resolution: string; builtin: Array<{ name: string; description: string; permission: string }>; mcp: Array<{ name: string; permission: string; credentialBinding: string | null; discovery: string }>; subagents: Array<{ agentId: string; version?: number }> }>();
   const [selected, setSelected] = useState<SessionEvent>();
   const [message, setMessage] = useState("");
   const [mode, setMode] = useState<"preview" | "debug">("preview");
@@ -113,10 +114,10 @@ export function SessionDetailPage() {
       setSession(current);
       setAgent((previous) => previous?.id === current.agentId ? previous : undefined);
       setEnvironment((previous) => previous?.id === current.environmentId ? previous : undefined);
-      const [currentAgent, currentEnvironment] = await Promise.all([
-        api.get<Agent>("agents", current.agentId), api.get<Environment>("environments", current.environmentId)
+      const [currentAgent, currentEnvironment, currentTools] = await Promise.all([
+        api.get<Agent>("agents", current.agentId), api.get<Environment>("environments", current.environmentId), api.effectiveTools(current.id)
       ]);
-      setAgent(currentAgent); setEnvironment(currentEnvironment);
+      setAgent(currentAgent); setEnvironment(currentEnvironment); setEffectiveTools(currentTools);
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
   }, [id]);
 
@@ -173,7 +174,7 @@ export function SessionDetailPage() {
         {session.pendingApproval && <div className="approval-bar"><Pause size={19} /><div><strong>工具调用等待批准</strong><p>{session.pendingApproval.call.name} · {session.pendingApproval.reason}</p><code>{JSON.stringify(session.pendingApproval.call.input)}</code></div><button className="button secondary danger" onClick={() => void resolveApproval(false)}><X size={15} />拒绝</button><button className="button primary" onClick={() => void resolveApproval(true)}><Check size={15} />允许一次</button></div>}
         <div className="task-composer"><textarea aria-label="给 Agent 分配一个任务" value={message} disabled={busy} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") void send(); }} placeholder={session.status === "waiting_approval" ? "请先处理工具审批" : session.status === "running" ? "Agent 正在运行…" : "给 Agent 分配一个任务"} /><button className="composer-command" aria-label="斜杠命令">/</button><button className="send-button" onClick={() => void send()} disabled={!message.trim() || busy}>{busy ? <Activity size={18} className="pulse-icon" /> : <Send size={18} />}</button><small><CornerDownLeft size={12} />⌘ Enter</small></div>
       </section>
-      <aside className="inspector"><div className="inspector-title"><strong>Event inspector</strong><span>{mode === "debug" ? "原始事件" : "结构化证据"}</span></div>{selected ? <><dl><div><dt>Event ID</dt><dd>{selected.id}</dd></div><div><dt>Sequence</dt><dd>#{selected.sequence}</dd></div><div><dt>Type</dt><dd>{selected.type}</dd></div><div><dt>Time</dt><dd>{new Date(selected.createdAt).toLocaleString()}</dd></div></dl><pre>{JSON.stringify(selected.payload, null, 2)}</pre></> : <div className="inspector-empty"><Play size={20} /><strong>选择一个事件</strong><p>查看 Tool Call、Policy Decision、Token usage 与 Tool Result 原始结构。</p></div>}</aside>
+      <aside className="inspector"><div className="inspector-title"><strong>事件与有效能力</strong><span>{mode === "debug" ? "原始事件" : "结构化证据"}</span></div>{selected ? <><dl><div><dt>Event ID</dt><dd>{selected.id}</dd></div><div><dt>Sequence</dt><dd>#{selected.sequence}</dd></div><div><dt>Type</dt><dd>{selected.type}</dd></div><div><dt>Time</dt><dd>{new Date(selected.createdAt).toLocaleString()}</dd></div></dl><pre>{JSON.stringify(selected.payload, null, 2)}</pre></> : <div className="effective-tools"><Play size={20} /><strong>本 Session 的有效能力</strong><p>{effectiveTools?.resolution ?? "正在解析固定 Agent Version…"}</p><h4>内置 Tool · {effectiveTools?.builtin.length ?? 0}</h4>{effectiveTools?.builtin.map((tool) => <span key={tool.name}><code>{tool.name}</code><small>{tool.permission}</small></span>)}<h4>MCP binding · {effectiveTools?.mcp.length ?? 0}</h4>{effectiveTools?.mcp.map((binding) => <span key={binding.name}><code>{binding.name}</code><small>{binding.permission} · Credential {binding.credentialBinding ?? "无"}</small></span>)}<h4>子 Agent · {effectiveTools?.subagents.length ?? 0}</h4></div>}</aside>
     </div>
     <Modal title="快捷 API 接入" open={apiOpen} onClose={() => setApiOpen(false)} footer={<button className="button primary" onClick={() => setApiOpen(false)}>完成</button>}><div className="api-steps"><section><span>STEP 1</span><h3>获取 API Key</h3><p>{apiKeys.length ? `已有 ${apiKeys.length} 个 API Key，可在系统设置中管理。` : "尚无 API Key，请先前往系统设置创建。"}</p>{apiKeys.map((key) => <div className="api-key-row" key={key.id}><KeyRound size={15} /><strong>{key.name}</strong><code>{key.keyPrefix}…</code></div>)}</section><section><span>STEP 2</span><h3>复制示例代码</h3><pre>{curl}</pre><button className="button secondary" onClick={() => void navigator.clipboard.writeText(curl)}>复制 cURL</button></section></div></Modal>
   </div>;

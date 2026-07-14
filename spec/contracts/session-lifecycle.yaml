@@ -2,17 +2,17 @@ dsl: snowmountain.spec/v1
 kind: state-machine
 metadata:
   id: session.lifecycle
-  title: Managed Session lifecycle
+  title: Managed Session 持久生命周期
   status: verified
   owners: [control-plane]
   tags: [session, queue, recovery]
 intent:
-  summary: A Session is durable state and evidence, not the lifetime of one model request or sandbox container.
+  summary: Session 是持久状态与证据，不等于一次模型请求或一个 Sandbox Container 的生命周期。
   outcomes:
-    - Interactions are serialized per Session and queued durably across process restarts.
-    - Interrupted side effects are never silently replayed after a restart.
+    - 每个 Session 内 Interaction 串行执行，持久队列跨进程重启恢复。
+    - 被中断的副作用不会在重启后静默重放。
   nonGoals:
-    - Reconstructing an interrupted model/tool call without an explicit retry.
+    - 在没有显式重试的情况下重建被中断的模型或 Tool Call。
 knowledge:
   - docs/notes/anthropic-managed-agents.md
   - docs/notes/fable5-sdd-dialogue-reading-notes.md

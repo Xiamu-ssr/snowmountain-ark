@@ -2,17 +2,17 @@ dsl: snowmountain.spec/v1
 kind: data-lifecycle
 metadata:
   id: memory.lifecycle
-  title: Explicit long-term Memory lifecycle
+  title: 显式长期 Memory 生命周期
   status: partial
   owners: [memory]
   tags: [memory, session, provenance]
 intent:
-  summary: Long-term Memory is an explicit resource with provenance, not an invisible copy of conversation history.
+  summary: 长期 Memory 是有来源的显式资源，不是对话历史的隐形副本。
   outcomes:
-    - A Session binds zero or more Memory Stores at creation and reads their current entries.
-    - Writes are explicit API/UI operations until an extraction policy is separately specified and reviewable.
+    - Session 创建时绑定零到多个 Memory Store，并读取其中当前条目。
+    - 在自动抽取策略被单独规范和审查前，写入只允许显式 API/UI 操作。
   nonGoals:
-    - Automatically treating model context compaction as durable cross-Session Memory.
+    - 自动把模型上下文 compact 当作可持久化的跨 Session Memory。
 knowledge:
   - docs/notes/fable5-sdd-dialogue-reading-notes.md
 specRefs: [session.lifecycle]

@@ -9,6 +9,10 @@ timestamp: 2026-07-13T23:58:00+08:00
 
 ## 2026-07-14
 
+- Market 扩展为多来源 Git 快照：接入 ClawHub 400 条、Official MCP Registry 302 条、Wind AIFin Market 98 条，加上 4 条本地审查样例共 804 条，并补齐来源、分类、验证层级、许可证、访问条件与风险标签。
+- Tool 解析改为 Session → 固定 Agent Version → Runtime 内置 Tool / MCP 动态发现 / 子 Agent；deny Tool 不再暴露给模型，并新增 Session 有效 Tool API 与人类投影。
+- Vault 契约改为显式 Credential binding：模型与 MCP 分别在 Agent Version 绑定；Environment 拒绝 secret 变量，Sandbox 防御性过滤旧 secret 数据。
+- Spec Viewer 固定文案与核心 YAML 标题改为中文，并新增 `tool.resolution`、`credential.binding` 两份高密度契约；OKF 仅作为按需知识链接。
 - 纠正对话归属：SDD/DSL 长对话对象是 Claude Fable 5，Opus 4.6 是话题起点而非对话模型。
 - 移除 Managed Agents 侧栏中的 SDD 业务栏目，建立内容无关的独立 Spec Viewer。
 - 新增六份 `snowmountain.spec/v1` YAML 契约、JSON Schema、语义校验、引用/覆盖检查和生成式 Viewer bundle；CI 会拒绝不可达状态、越界能力、断裂引用与过期投影。

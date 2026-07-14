@@ -101,6 +101,12 @@ export class McpProxy {
     return this.rpc(tool.binding, "tools/call", { name: tool.remoteName, arguments: args });
   }
 
+  async resolveCredential(credentialId: string): Promise<string> {
+    const credential = this.store.get<Credential>(credentialId);
+    if (!credential) throw new Error(`Credential not found: ${credentialId}`);
+    return this.accessToken(credential);
+  }
+
   private async accessToken(credential: Credential): Promise<string> {
     const current = openSecret(credential.secretCiphertext);
     if (credential.authType === "bearer") return current;

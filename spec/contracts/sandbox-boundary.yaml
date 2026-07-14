@@ -2,20 +2,20 @@ dsl: snowmountain.spec/v1
 kind: capability-policy
 metadata:
   id: sandbox.boundary
-  title: Sandbox and credential containment
+  title: Sandbox 与 Credential 隔离边界
   status: verified
   owners: [runtime-security]
   tags: [sandbox, docker, containment]
 intent:
-  summary: No single execution component may hold both arbitrary code execution and production credentials.
+  summary: 任何单一执行组件都不能同时拥有任意代码执行权和生产 Credential。
   outcomes:
-    - Tool code runs with a Session workspace and explicit resource ceilings.
-    - The Docker-socket-bearing Worker cannot read Vault or model credentials.
+    - Tool 代码只能在 Session Workspace 和明确资源上限内运行。
+    - 持有 Docker Socket 的 Worker 不能读取 Vault 或模型 Credential。
   nonGoals:
-    - Claiming OCI containers provide a hostile multi-tenant boundary equivalent to a microVM.
+    - 声称 OCI Container 已提供与 microVM 等价的敌对多租户隔离。
 knowledge:
   - docs/notes/anthropic-containment.md
-specRefs: [session.lifecycle]
+specRefs: [session.lifecycle, credential.binding]
 contract:
   subjects:
     - { id: api, label: Credential-bearing control plane }

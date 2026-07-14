@@ -2,19 +2,19 @@ dsl: snowmountain.spec/v1
 kind: component
 metadata:
   id: control-plane.capabilities
-  title: Managed Agents control-plane capability map
+  title: Managed Agents 中台能力全景图
   status: partial
   owners: [control-plane]
   tags: [ui, api, parity]
 intent:
-  summary: Give humans a compressed, reviewable view of implemented, partial and planned platform capabilities.
+  summary: 用可审查的高密度投影向人类展示已验证、部分实现和规划中的平台能力。
   outcomes:
-    - Progress is derived from structured status and verification links rather than inferred by reading many Markdown files.
+    - 进度来自结构化状态与验证证据，不要求人类阅读大量 Markdown 后自行推测。
   nonGoals:
-    - Claiming complete feature parity from the existence of a page or route.
+    - 因为存在页面或路由就声称已经完整对齐火山方舟。
 knowledge:
   - docs/notes/volcengine-managed-agents-reverse-engineering.md
-specRefs: [session.lifecycle, sandbox.boundary, agent.runtime, memory.lifecycle, market.integration]
+specRefs: [session.lifecycle, sandbox.boundary, agent.runtime, memory.lifecycle, market.integration, tool.resolution, credential.binding]
 contract:
   role: human-and-api-control-plane
   runtime: fastify-react-sqlite
@@ -24,10 +24,10 @@ contract:
     - { id: control-api, direction: in, protocol: authenticated-rest }
     - { id: data-api, direction: in, protocol: bearer-rest }
   features:
-    - { id: agents, label: Agents and immutable versions, status: verified, evidence: apps/api/test/api.test.ts }
-    - { id: sessions, label: "Sessions, queue, approvals and event replay", status: verified, evidence: apps/api/test/api.test.ts }
-    - { id: environments, label: Environment packages and variables, status: implemented, evidence: apps/web/src/pages/Resources.tsx }
-    - { id: vault, label: Credential Vault and OAuth refresh, status: verified, evidence: apps/api/test/mcp.test.ts }
+    - { id: agents, label: Agent 与不可变版本, status: verified, evidence: apps/api/test/api.test.ts }
+    - { id: sessions, label: "Session、持久队列、审批与事件回放", status: verified, evidence: apps/api/test/api.test.ts }
+    - { id: environments, label: Environment 依赖与普通变量, status: implemented, evidence: apps/web/src/pages/Resources.tsx }
+    - { id: vault, label: Credential Vault、显式绑定与 OAuth 刷新, status: verified, evidence: apps/api/test/mcp.test.ts }
     - { id: memory, label: Explicit Memory Stores, status: partial, evidence: spec/contracts/memory-lifecycle.yaml }
     - { id: market, label: Git-first Market integration, status: implemented, evidence: spec/contracts/market-integration.yaml }
     - { id: sandbox, label: Replaceable isolated execution backend, status: verified, evidence: apps/worker/test/worker.test.ts }
@@ -41,7 +41,7 @@ implementation:
     - apps/api/src/app.ts
     - apps/web/src/App.tsx
   notes:
-    - The Spec Viewer is a developer projection and is not a Managed Agents business module.
+    - 规范查看器是开发者投影，不是 Managed Agents 业务模块。
 verification:
   tests:
     - apps/api/test/api.test.ts

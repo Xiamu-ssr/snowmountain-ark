@@ -25,6 +25,7 @@ timestamp: 2026-07-13T23:58:00+08:00
 - [Containment：能力越强，越要限制爆炸半径](./notes/anthropic-containment.md)
 - [Fable 5 长对话读书笔记：从对抗基模到设计收敛系统](./notes/fable5-sdd-dialogue-reading-notes.md)
 - [Agent Runtime、Sandbox、资源与 Memory 的事实边界](./notes/runtime-sandbox-memory-decisions.md)
+- [雪山 Market 外部来源适配器与信任分层](./notes/market-source-adapters.md)
 - [火山方舟 Managed Agents 反向工程记录](./notes/volcengine-managed-agents-reverse-engineering.md)
 
 ## 工程原则
@@ -34,6 +35,7 @@ timestamp: 2026-07-13T23:58:00+08:00
 3. 凭证保留在 Vault 与代理层，绝不进入模型上下文或沙箱环境变量。
 4. 环境层先做确定性隔离；模型分类器只做纵深防御。
 5. Market 的 Git 数据是事实源；网站、搜索索引和安装说明都是投影。
-6. OKF 管可移植知识，资源 Manifest 管可执行契约，两者不能混为一谈。
+6. OKF 面向 Agent 管可移植知识；`spec/contracts` DSL 面向人类管高密度可执行契约，Viewer 只渲染 DSL 投影并按需链接 OKF。
 7. API 可持有 Vault/模型凭证但不能持有 Docker Socket；Worker 可以持有 Docker Socket，但不能持有业务凭证。
 8. 排队任务必须落盘；已开始执行的任务在故障后显式失败，不自动重放可能有副作用的工具调用。
+9. Vault 不隐式应用到所有 Environment/Session；模型和 MCP 只能通过 Agent Version 中的 Credential ID 显式引用秘密。

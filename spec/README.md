@@ -1,36 +1,32 @@
-# Snowmountain Spec Profile
+# 雪山方舟 Spec Profile
 
-`spec/` is the machine-checkable alignment layer between intent and code. It is
-not a second documentation bundle and it is not runtime state.
+`spec/` 是意图和代码之间的机器可校验对齐层，不是第二套知识库，也不是运行时状态。
 
-One fact has one authoritative home:
+一个事实只允许一个权威位置：
 
-- rationale, research and reading notes live in the OKF bundle under `docs/`;
-- executable semantics live in YAML contracts under `spec/contracts/`;
-- implementation lives in source code;
-- runtime facts live in SQLite, event streams and deployment systems;
-- `spec/generated/bundle.json` and the Spec Viewer are projections generated
-  from those sources and must not be edited as independent facts.
+- `docs/` 中的 OKF 面向 Agent，保存研究、动机、读书笔记和决策背景；
+- `spec/contracts/*.yaml` 中的 DSL 保存人类需要高密度审查的状态、关系、能力边界、不变量和验收条件；
+- 源代码保存实现；
+- SQLite、事件流和部署系统保存运行事实；
+- `spec/generated/bundle.json` 与 Spec Viewer 只是投影，不能被反向编辑成第二事实源。
 
-The YAML profile is deliberately small. Every document has:
+因此读书笔记属于 OKF，但不要求全部渲染到 Spec Viewer。Viewer 主要渲染 DSL，只把 `knowledge` 路径作为按需追溯链接。这里所谓 Contracts（契约）就是 `spec/contracts/`，没有必要再把 OKF 拆成两份相互复制的 Markdown。
 
-- `intent`: why/outcomes, linking rather than duplicating OKF knowledge;
-- `contract`: kind-specific, parseable semantics;
-- `implementation`: source paths that realize the contract;
-- `verification`: tests/assertions that prove it;
-- `specRefs`: dependencies on other contracts.
+## DSL 结构
 
-Supported contract kinds are `state-machine`, `capability-policy`, `component`,
-`data-lifecycle` and `integration`. Their syntax is defined by
-`schema/snowmountain-spec.schema.json`; semantic checks such as state
-reachability, reference integrity, implementation/test existence and
-capability separation are enforced by `scripts/spec.mjs`.
+每份 `snowmountain.spec/v1` YAML 都包含：
+
+- `intent`：压缩后的目的和结果，链接而不复制 OKF；
+- `contract`：按 kind 区分的可解析语义；
+- `implementation`：实现该契约的代码路径；
+- `verification`：证明契约成立的测试与断言；
+- `specRefs`：其他契约依赖。
+
+支持 `state-machine`、`capability-policy`、`component`、`data-lifecycle` 和 `integration`。语法由 `schema/snowmountain-spec.schema.json` 定义；`scripts/spec.mjs` 继续检查状态可达性、引用完整性、实现/测试/evidence 文件存在、能力隔离和 Viewer 投影漂移。
 
 ```sh
-pnpm spec:build   # validate and regenerate the viewer bundle
-pnpm spec:check   # validate and fail if the generated projection drifted
+pnpm spec:build   # 校验并重新生成 Viewer bundle
+pnpm spec:check   # 校验，并在生成投影与 DSL 不一致时失败
 ```
 
-The Viewer is content-agnostic UI. It renders the bundle returned by the API;
-project names, statuses, transitions, policies, knowledge links and source YAML
-all come from the data source rather than being embedded in React components.
+Viewer 本身不包含雪山方舟项目数据。项目名、状态、状态迁移、能力矩阵、知识链接和 YAML 原文全部来自 API 数据源。

@@ -1,0 +1,54 @@
+dsl: snowmountain.spec/v1
+kind: component
+metadata:
+  id: tool.resolution
+  title: Tool 来源与 Session 有效能力解析
+  status: verified
+  owners: [agent-runtime]
+  tags: [tool, session, agent-version, mcp]
+intent:
+  summary: 让人和 Agent 能明确回答每个 Session 到底能看到哪些 Tool，以及每项能力来自哪里。
+  outcomes:
+    - 内置 Tool 由版本化 Runtime Registry 定义，不由 Session 临时生成。
+    - Agent Version 固化 Tool Policy、MCP binding 与子 Agent binding。
+    - Session 固定 Agent Version，因此有效能力可重放且不受后续编辑污染。
+    - permission=deny 的内置 Tool 不进入模型可见 tool list。
+  nonGoals:
+    - 把 Market 条目被选中等同于代码已经安装。
+knowledge:
+  - docs/notes/runtime-sandbox-memory-decisions.md
+specRefs: [agent.runtime, session.lifecycle, credential.binding]
+contract:
+  role: effective-tool-resolver
+  runtime: agent-version-derived
+  adapters:
+    - { id: runtime-builtin, label: Runtime 内置 Tool Registry }
+    - { id: mcp-dynamic, label: Agent MCP binding 运行时 tools/list }
+    - { id: subagent-delegation, label: Agent Version 固定的子 Agent 委派 Tool }
+  ports:
+    - { id: session, direction: in, protocol: pinned-agent-version/v1 }
+    - { id: policy, direction: in, protocol: tool-permission-map/v1 }
+    - { id: effective-tools, direction: out, protocol: effective-tool-list/v1 }
+  features:
+    - { id: builtin-registry, label: 内置 Tool 定义集中管理, status: verified, evidence: apps/api/src/tools.ts }
+    - { id: deny-filter, label: deny Tool 不暴露给模型, status: verified, evidence: apps/api/test/api.test.ts }
+    - { id: mcp-discovery, label: MCP Tool 由显式 binding 动态发现, status: verified, evidence: apps/api/test/mcp.test.ts }
+    - { id: session-projection, label: Session 有效 Tool API, status: verified, evidence: apps/api/test/api.test.ts }
+  limitations:
+    - Skill 目前只作为 Agent Version 中的能力引用保存，尚未自动装载到 Prompt 或 Sandbox。
+    - Market MCP 条目只表示发现与选择；必须形成含 URL、Policy、Credential 的 MCP binding 才能运行。
+implementation:
+  code:
+    - apps/api/src/tools.ts
+    - apps/api/src/harness.ts
+    - apps/api/src/mcp.ts
+    - apps/api/src/app.ts
+  notes:
+    - 有效 Tool 集合是 Session 固定 Agent Version 与 Runtime Registry 的交集，不是 Session 独立配置。
+verification:
+  tests:
+    - apps/api/test/api.test.ts
+    - apps/api/test/mcp.test.ts
+  assertions:
+    - { id: replayable-list, assertion: 同一 Session 固定版本的有效内置 Tool 列表不会因 Agent 后续编辑而改变。 }
+    - { id: denied-hidden, assertion: permission=deny 的 Tool 不进入模型请求。 }

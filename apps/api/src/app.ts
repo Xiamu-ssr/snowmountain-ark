@@ -11,6 +11,7 @@ import type {
   DependencyEdge,
   Environment,
   ManagedResource,
+  MarketCatalog,
   MarketEntry,
   MemoryStore,
   MonitoringSummary,
@@ -29,6 +30,7 @@ import { fetchClientCredentialsToken } from "./mcp.js";
 import { InteractionQueue } from "./queue.js";
 import { Sandbox } from "./sandbox.js";
 import { loadSpecBundle } from "./specs.js";
+import { effectiveBuiltinTools } from "./tools.js";
 import { sealSecret } from "./vault.js";
 
 export interface AppOptions {
@@ -56,6 +58,7 @@ const modelInput = z.object({
   provider: z.enum(["mock", "openai-compatible"]),
   name: z.string().min(1),
   baseUrl: z.string().url().optional(),
+  credentialId: z.string().optional(),
   endpointId: z.string().optional(),
   displayName: z.string().optional(),
   contextWindow: z.number().int().positive().optional(),
@@ -104,6 +107,7 @@ function dependencyEdges(store: Store): DependencyEdge[] {
   const edges: DependencyEdge[] = [];
   for (const agent of store.list<Agent>("agent")) {
     edges.push({ source: agent.id, target: `model:${agent.model.name}`, relation: "uses-model" });
+    if (agent.model.credentialId) edges.push({ source: agent.id, target: agent.model.credentialId, relation: "uses-model-credential" });
     for (const id of agent.skillIds) edges.push({ source: agent.id, target: id, relation: "uses-skill" });
     for (const id of agent.mcpIds) edges.push({ source: agent.id, target: id, relation: "uses-mcp" });
     for (const binding of agent.mcpServers ?? []) {
@@ -362,8 +366,15 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       .map((id) => store.get<Agent>(id))
       .find((candidate) => candidate && candidate.subAgentIds.length > 0);
     if (nestedSubAgent) return reply.code(400).send({ error: "nested_multi_agent_not_allowed", agentId: nestedSubAgent.id });
+    if (parsed.data.model?.credentialId) {
+      const credential = store.get<Credential>(parsed.data.model.credentialId);
+      if (!credential) return reply.code(400).send({ error: "model_credential_not_found", credentialId: parsed.data.model.credentialId });
+      if (!["model", "generic"].includes(credential.usage ?? "mcp")) return reply.code(400).send({ error: "credential_usage_mismatch", expected: "model", credentialId: credential.id });
+    }
     const missingCredential = (parsed.data.mcpServers ?? []).find((binding) => binding.credentialId && !store.get<Credential>(binding.credentialId));
     if (missingCredential) return reply.code(400).send({ error: "credential_not_found", credentialId: missingCredential.credentialId });
+    const wrongMcpCredential = (parsed.data.mcpServers ?? []).map((binding) => binding.credentialId ? store.get<Credential>(binding.credentialId) : undefined).find((credential) => credential?.usage === "model");
+    if (wrongMcpCredential) return reply.code(400).send({ error: "credential_usage_mismatch", expected: "mcp", credentialId: wrongMcpCredential.id });
     return reply.code(201).send(store.create<Agent>("agent", {
       kind: "agent",
       name: parsed.data.name,
@@ -395,6 +406,15 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       .map((id) => store.get<Agent>(id))
       .find((candidate) => candidate && candidate.subAgentIds.length > 0);
     if (nestedSubAgent) return reply.code(400).send({ error: "nested_multi_agent_not_allowed", agentId: nestedSubAgent.id });
+    if (patch.data.model?.credentialId) {
+      const credential = store.get<Credential>(patch.data.model.credentialId);
+      if (!credential) return reply.code(400).send({ error: "model_credential_not_found", credentialId: patch.data.model.credentialId });
+      if (!["model", "generic"].includes(credential.usage ?? "mcp")) return reply.code(400).send({ error: "credential_usage_mismatch", expected: "model", credentialId: credential.id });
+    }
+    const missingCredential = (patch.data.mcpServers ?? []).find((binding) => binding.credentialId && !store.get<Credential>(binding.credentialId));
+    if (missingCredential) return reply.code(400).send({ error: "credential_not_found", credentialId: missingCredential.credentialId });
+    const wrongMcpCredential = (patch.data.mcpServers ?? []).map((binding) => binding.credentialId ? store.get<Credential>(binding.credentialId) : undefined).find((credential) => credential?.usage === "model");
+    if (wrongMcpCredential) return reply.code(400).send({ error: "credential_usage_mismatch", expected: "mcp", credentialId: wrongMcpCredential.id });
     const cleanPatch = Object.fromEntries(Object.entries(patch.data).filter(([, value]) => value !== undefined)) as Partial<Agent>;
     if (patch.data.subAgentIds) cleanPatch.subAgentVersions = Object.fromEntries(patch.data.subAgentIds.map((id) => [id, store.get<Agent>(id)?.version]).filter((entry): entry is [string, number] => typeof entry[1] === "number"));
     return store.update<Agent>(agent.id, cleanPatch, { versionAgent: true });
@@ -414,6 +434,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       filesystemMode: z.enum(["read-only", "read-write", "read-write-no-delete"]).optional()
     }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (parsed.data.variables?.some((variable) => variable.secret)) return reply.code(400).send({ error: "environment_secret_not_allowed", use: "vault_credential_binding" });
     return reply.code(201).send(store.create<Environment>("environment", {
       kind: "environment", name: parsed.data.name, description: parsed.data.description,
       packages: parsed.data.packages ?? [], variables: parsed.data.variables ?? [],
@@ -431,6 +452,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       filesystemMode: z.enum(["read-only", "read-write", "read-write-no-delete"]).optional()
     }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (parsed.data.variables?.some((variable) => variable.secret)) return reply.code(400).send({ error: "environment_secret_not_allowed", use: "vault_credential_binding" });
     return store.update<Environment>(environment.id, parsed.data as Partial<Environment>);
   });
 
@@ -452,6 +474,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   app.post("/v1/credentials/validate", async (request, reply) => {
     const parsed = z.object({
       serverUrl: z.string().url(),
+      usage: z.enum(["mcp", "model", "generic"]).optional().default("mcp"),
       authType: z.enum(["bearer", "oauth"]),
       secret: z.string().optional(),
       tokenUrl: z.string().url().optional(),
@@ -469,14 +492,14 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
             ...(parsed.data.scopes ? { scopes: parsed.data.scopes } : {})
           })).accessToken
         : parsed.data.secret;
-      const response = await fetch(parsed.data.serverUrl, {
-        method: "POST",
+      const modelValidation = parsed.data.usage === "model";
+      const response = await fetch(modelValidation ? `${parsed.data.serverUrl.replace(/\/$/, "")}/models` : parsed.data.serverUrl, {
+        method: modelValidation ? "GET" : "POST",
         headers: {
-          "content-type": "application/json",
-          accept: "application/json, text/event-stream",
+          ...(modelValidation ? {} : { "content-type": "application/json", accept: "application/json, text/event-stream" }),
           ...(token ? { authorization: `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({ jsonrpc: "2.0", id: "snowmountain-validation", method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "snowmountain-ark", version: "0.2.0" } } }),
+        ...(modelValidation ? {} : { body: JSON.stringify({ jsonrpc: "2.0", id: "snowmountain-validation", method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "snowmountain-ark", version: "0.2.0" } } }) }),
         signal: AbortSignal.timeout(10_000)
       });
       return { valid: response.ok, status: response.status, checkedAt: new Date().toISOString() };
@@ -488,6 +511,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   app.post("/v1/credentials", async (request, reply) => {
     const parsed = baseInput.extend({
       vaultId: z.string(), serverUrl: z.string().url(), authType: z.enum(["bearer", "oauth"]),
+      usage: z.enum(["mcp", "model", "generic"]).optional().default("mcp"),
       secret: z.string().optional().default(""), mcpServerId: z.string().optional(), mcpServerName: z.string().optional(),
       clientId: z.string().optional(), clientSecret: z.string().optional(), tokenUrl: z.string().url().optional(),
       scopes: z.array(z.string()).optional(), expiresAt: z.string().datetime().optional(),
@@ -497,7 +521,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     if (!store.get<Vault>(parsed.data.vaultId)) return reply.code(400).send({ error: "vault_not_found" });
     const credential = store.create<Credential>("credential", {
       kind: "credential", name: parsed.data.name, description: parsed.data.description,
-      vaultId: parsed.data.vaultId, serverUrl: parsed.data.serverUrl, authType: parsed.data.authType,
+      vaultId: parsed.data.vaultId, usage: parsed.data.usage, serverUrl: parsed.data.serverUrl, authType: parsed.data.authType,
       secretCiphertext: sealSecret(parsed.data.secret || "oauth-pending"),
       mcpServerId: parsed.data.mcpServerId, mcpServerName: parsed.data.mcpServerName,
       clientId: parsed.data.clientId,
@@ -596,6 +620,35 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     await sandbox.provision(session.id);
     store.appendEvent(session.id, "status", { status: "idle", content: "Session initialized" });
     return reply.code(201).send(session);
+  });
+
+  app.get<{ Params: { id: string } }>("/v1/sessions/:id/effective-tools", async (request, reply) => {
+    const session = store.get<Session>(request.params.id);
+    if (!session) return reply.code(404).send({ error: "not_found" });
+    const agent = store.getAgentVersion(session.agentId, session.agentVersion) ?? store.get<Agent>(session.agentId);
+    if (!agent) return reply.code(409).send({ error: "pinned_agent_version_missing" });
+    return {
+      sessionId: session.id,
+      agentId: agent.id,
+      agentVersion: session.agentVersion,
+      resolution: "Session → 固定 Agent Version → 内置工具策略 + MCP 动态发现 + 子 Agent 委派",
+      builtin: effectiveBuiltinTools(agent).map((tool) => ({
+        name: tool.function.name,
+        description: tool.function.description,
+        permission: tool.permission,
+        source: "runtime-builtin"
+      })),
+      mcp: (agent.mcpServers ?? []).map((binding) => ({
+        bindingId: binding.id,
+        name: binding.name,
+        permission: binding.permission,
+        credentialBinding: binding.credentialId ?? null,
+        source: binding.source,
+        discovery: "运行时 tools/list"
+      })),
+      subagents: agent.subAgentIds.map((id) => ({ agentId: id, version: agent.subAgentVersions?.[id], source: "pinned-agent-version" })),
+      skills: agent.skillIds.map((id) => ({ id, source: "agent-version", runtimeEffect: "当前仅作为能力引用；尚未自动装载到 Prompt" }))
+    };
   });
 
   app.get<{ Params: { id: string }; Querystring: { after?: string } }>("/v1/sessions/:id/events", async (request, reply) => {
@@ -730,12 +783,12 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   app.get("/v1/specs", async (): Promise<SpecBundle> => ({
     ...specBundle,
     runtimeFacts: [
-      { id: "runtime.harness", label: "Agent runtime", value: "bespoke-simple-harness", source: "process-config" },
-      { id: "runtime.model", label: "Production model credential", value: Boolean(process.env.MODEL_API_KEY), source: "process-config" },
-      { id: "runtime.sandbox", label: "Sandbox driver", value: config.sandboxDriver, source: "process-config" },
-      { id: "runtime.memory-extraction", label: "Automatic Memory extraction", value: false, source: "memory.lifecycle" },
-      { id: "runtime.resources", label: "Managed resources", value: store.count(), source: "sqlite" },
-      { id: "runtime.market", label: "Market endpoint", value: config.marketPublicUrl, source: "process-config" }
+      { id: "runtime.harness", label: "Agent 运行时", value: "bespoke-simple-harness", source: "进程配置" },
+      { id: "runtime.model", label: "系统默认模型凭证", value: Boolean(process.env.MODEL_API_KEY), source: "进程配置" },
+      { id: "runtime.sandbox", label: "Sandbox 驱动", value: config.sandboxDriver, source: "进程配置" },
+      { id: "runtime.memory-extraction", label: "自动抽取长期 Memory", value: false, source: "memory.lifecycle" },
+      { id: "runtime.resources", label: "中台资源数量", value: store.count(), source: "SQLite" },
+      { id: "runtime.market", label: "Market 公开地址", value: config.marketPublicUrl, source: "进程配置" }
     ]
   }));
 
@@ -745,8 +798,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     try {
       const response = await fetch(config.marketIndexUrl, { signal: AbortSignal.timeout(5_000) });
       if (!response.ok) throw new Error(`Market returned ${response.status}`);
-      const payload = await response.json() as { format?: string; items?: MarketEntry[] };
-      if (payload.format !== "snowmountain-market-catalog/v1" || !Array.isArray(payload.items)) throw new Error("Market returned an invalid catalog");
+      const payload = await response.json() as MarketCatalog;
+      if (!new Set(["snowmountain-market-catalog/v1", "snowmountain-market-catalog/v2"]).has(payload.format ?? "") || !Array.isArray(payload.items)) throw new Error("Market returned an invalid catalog");
       return { ...payload, source: config.marketPublicUrl, endpoint: config.marketIndexUrl, offline: false };
     } catch (error) {
       app.log.warn({ error }, "Market catalog unavailable");

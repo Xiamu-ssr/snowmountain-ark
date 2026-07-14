@@ -2,17 +2,18 @@ dsl: snowmountain.spec/v1
 kind: integration
 metadata:
   id: market.integration
-  title: Snowmountain Market catalog integration
+  title: 雪山 Market 多来源 Catalog 集成
   status: implemented
   owners: [market, control-plane]
   tags: [market, git-first, catalog]
 intent:
-  summary: Ark discovers versioned capabilities from a separately deployable Git-first Market instance.
+  summary: 方舟从可独立部署的 Git-first Market 实例发现带来源、分类、风险和版本信息的能力。
   outcomes:
-    - Ark consumes a validated catalog endpoint without owning Market source data.
-    - A local production mirror remains usable when the server cannot reach GitHub Pages.
+    - 方舟消费经过格式校验的 Catalog Endpoint，但不拥有 Market 的源数据。
+    - 当服务器无法访问 GitHub Pages 时，本地生产镜像仍然可用。
+    - 外部 Registry 同步结果进入 Git 快照，运行时不直接依赖 ClawHub、MCP Registry 或 Wind 在线。
   nonGoals:
-    - Installing capabilities or storing user credentials inside Market.
+    - 在 Market 内替用户安装能力或保存用户 Credential。
 knowledge:
   - docs/notes/google-open-knowledge-format.md
 specRefs: [agent.runtime]
@@ -24,7 +25,7 @@ contract:
     - { id: public-viewer, purpose: Human browsing and installation guidance, visibility: public }
   health:
     timeoutMs: 5000
-    success: HTTP 2xx with snowmountain-market-catalog/v1 and an items array
+    success: HTTP 2xx with snowmountain-market-catalog/v2、sources、分类信息和 items 数组
   fallback: Serve the same Git-built static catalog from an independently deployed local Market container; never synthesize an empty catalog as healthy.
 implementation:
   code:

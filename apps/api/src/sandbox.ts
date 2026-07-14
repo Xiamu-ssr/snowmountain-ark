@@ -110,7 +110,7 @@ export class Sandbox {
   private async runCommand(session: Session, environment: Environment, command: string): Promise<unknown> {
     const workspace = await this.provision(session.id);
     const resource = session.resourceConfig ?? { cpu: 1, memoryMiB: 512, maxRuntimeSeconds: 3600, networkMode: "deny" as const };
-    const environmentArgs = environment.variables.flatMap((variable) => ["-e", `${variable.key}=${variable.value}`]);
+    const environmentArgs = environment.variables.filter((variable) => !variable.secret).flatMap((variable) => ["-e", `${variable.key}=${variable.value}`]);
     if (this.options.driver === "docker") {
       const runtimeMs = Math.min(Math.max(resource.maxRuntimeSeconds, 1), 3600) * 1000;
       const mountWorkspace = this.options.hostDataDir
@@ -135,7 +135,7 @@ export class Sandbox {
       env: {
         PATH: process.env.PATH ?? "/usr/bin:/bin",
         HOME: workspace,
-        ...Object.fromEntries(environment.variables.map((variable) => [variable.key, variable.value]))
+        ...Object.fromEntries(environment.variables.filter((variable) => !variable.secret).map((variable) => [variable.key, variable.value]))
       }
     });
     const canonicalWorkspace = await realpath(workspace);

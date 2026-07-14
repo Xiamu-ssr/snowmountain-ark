@@ -2,37 +2,37 @@ dsl: snowmountain.spec/v1
 kind: component
 metadata:
   id: agent.runtime
-  title: Agent runtime and model loop
+  title: Agent 运行时与模型工具循环
   status: partial
   owners: [agent-runtime]
   tags: [harness, model, tools]
 intent:
-  summary: Keep Session, tools and evidence stable while allowing the model/runtime implementation to be replaced.
+  summary: 保持 Session、Tool 与证据契约稳定，同时允许替换模型和 Agent Runtime 实现。
   outcomes:
-    - Deterministic tests run without an external LLM.
-    - OpenAI-compatible endpoints can drive a bounded tool-call loop through the same policy and event surfaces.
+    - 确定性测试无需外部 LLM。
+    - OpenAI-compatible Endpoint 通过同一 Policy 与事件面执行有上限的 Tool 循环。
   nonGoals:
-    - Presenting the current bespoke Harness as feature-equivalent to Claude Agent SDK or OpenCode.
+    - 把当前自研 Harness 描述成与 Claude Agent SDK 或 OpenCode 功能等价。
 knowledge:
   - docs/notes/anthropic-managed-agents.md
   - docs/notes/anthropic-auto-mode.md
-specRefs: [session.lifecycle, sandbox.boundary]
+specRefs: [session.lifecycle, sandbox.boundary, tool.resolution, credential.binding]
 contract:
   role: replaceable-agent-harness
   runtime: bespoke-simple-harness
   adapters:
-    - { id: deterministic-local, label: Deterministic local harness with no LLM inference }
-    - { id: openai-compatible, label: OpenAI-compatible Chat Completions tool loop }
+    - { id: deterministic-local, label: 不调用 LLM 的本地确定性 Harness }
+    - { id: openai-compatible, label: OpenAI-compatible Chat Completions Tool 循环 }
   ports:
     - { id: interaction, direction: in, protocol: durable-interaction-job/v1 }
     - { id: model, direction: out, protocol: openai-chat-completions-compatible }
     - { id: tools, direction: out, protocol: policy-gated-tool-call/v1 }
     - { id: evidence, direction: out, protocol: append-only-session-events/v1 }
   features:
-    - { id: deterministic-mode, label: Deterministic no-LLM acceptance mode, status: verified, evidence: apps/api/test/api.test.ts }
-    - { id: openai-loop, label: OpenAI-compatible model/tool loop, status: implemented, evidence: apps/api/src/harness.ts }
-    - { id: sdk-adapter, label: Claude Agent SDK or OpenCode runtime adapter, status: planned }
-    - { id: context-compaction, label: Runtime context compaction, status: planned }
+    - { id: deterministic-mode, label: 确定性无 LLM 验收模式, status: verified, evidence: apps/api/test/api.test.ts }
+    - { id: openai-loop, label: OpenAI-compatible 模型与 Tool 循环, status: implemented, evidence: apps/api/src/harness.ts }
+    - { id: sdk-adapter, label: Claude Agent SDK 或 OpenCode Runtime Adapter, status: planned }
+    - { id: context-compaction, label: Runtime 上下文压缩, status: planned }
   limitations:
     - Production currently has no model credential configured; the deployed acceptance Agent uses deterministic-local.
     - The bespoke loop does not yet provide the mature context management, subagent ergonomics and compatibility surface of a full agent SDK.
