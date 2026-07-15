@@ -25,6 +25,7 @@ timestamp: 2026-07-13T23:58:00+08:00
 - [Containment：能力越强，越要限制爆炸半径](./notes/anthropic-containment.md)
 - [Fable 5 长对话读书笔记：从对抗基模到设计收敛系统](./notes/fable5-sdd-dialogue-reading-notes.md)
 - [Agent Runtime、Sandbox、资源与 Memory 的事实边界](./notes/runtime-sandbox-memory-decisions.md)
+- [Base Agent Runtime 与平台控制面的职责](./notes/base-agent-runtime-and-platform-control.md)
 - [雪山 Market 外部来源适配器与信任分层](./notes/market-source-adapters.md)
 - [火山方舟 Managed Agents 反向工程记录](./notes/volcengine-managed-agents-reverse-engineering.md)
 
@@ -38,4 +39,5 @@ timestamp: 2026-07-13T23:58:00+08:00
 6. OKF 面向 Agent 管可移植知识；`spec/contracts` DSL 面向人类管高密度可执行契约，Viewer 只渲染 DSL 投影并按需链接 OKF。
 7. API 可持有 Vault/模型凭证但不能持有 Docker Socket；Worker 可以持有 Docker Socket，但不能持有业务凭证。
 8. 排队任务必须落盘；已开始执行的任务在故障后显式失败，不自动重放可能有副作用的工具调用。
-9. Vault 不隐式应用到所有 Environment/Session；模型和 MCP 只能通过 Agent Version 中的 Credential ID 显式引用秘密。
+9. Vault 是租户级可发现资源池，但秘密只由 MCP/Skill binding 的代理层使用；平台模型凭证由管理员 Endpoint 托管。
+10. 普通用户的 Managed Resources 必须带 tenantId，并在列表、单项读取、关联校验、删除和事件读取上执行同一租户过滤。

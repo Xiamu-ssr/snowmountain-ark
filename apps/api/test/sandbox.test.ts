@@ -11,7 +11,7 @@ const session: Session = {
   id: "sesn-test", kind: "session", name: "test", description: "", createdAt: now, updatedAt: now,
   agentId: "agent-test", agentVersion: 1, environmentId: "env-test", memoryStoreIds: [], status: "idle",
   inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, workspacePath: "/workspace",
-  resourceConfig: { cpu: 1, memoryMiB: 512, maxRuntimeSeconds: 3600, networkMode: "deny" }
+  resourceConfig: { cpu: 1, memoryMiB: 512, maxRuntimeSeconds: 3600, networkMode: "full" }
 };
 const environment: Environment = {
   id: "env-test", kind: "environment", name: "test", description: "", createdAt: now, updatedAt: now,

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthGate } from "./components/Auth";
+import { useAuth } from "./components/Auth";
 import { Shell } from "./components/Shell";
 import { AgentCreatePage, AgentDetailPage, AgentEditPage, AgentsPage } from "./pages/Agents";
 import { DependenciesPage } from "./pages/Dependencies";
@@ -8,10 +9,15 @@ import { EnvironmentDetailPage, EnvironmentsPage, MemoryDetailPage, MemoryPage, 
 import { SpecViewerPage } from "./pages/Specs";
 import { SessionDetailPage, SessionsPage } from "./pages/Sessions";
 import { SettingsPage } from "./pages/Settings";
+import type { ReactNode } from "react";
+
+function AdminOnly({ children }: { children: ReactNode }) {
+  return useAuth().role === "admin" ? children : <Navigate to="/agents" replace />;
+}
 
 export function App() {
   return <AuthGate><Routes>
-    <Route path="specs" element={<SpecViewerPage />} />
+    <Route path="specs" element={<AdminOnly><SpecViewerPage /></AdminOnly>} />
     <Route element={<Shell />}>
       <Route index element={<Navigate to="/agents" replace />} />
       <Route path="agents" element={<AgentsPage />} />
@@ -28,7 +34,8 @@ export function App() {
       <Route path="memory/:id" element={<MemoryDetailPage />} />
       <Route path="market" element={<MarketPage />} />
       <Route path="dependencies" element={<DependenciesPage />} />
-      <Route path="settings" element={<SettingsPage />} />
+      <Route path="admin" element={<AdminOnly><SettingsPage /></AdminOnly>} />
+      <Route path="settings" element={<Navigate to="/admin" replace />} />
       <Route path="*" element={<Navigate to="/agents" replace />} />
     </Route>
   </Routes></AuthGate>;

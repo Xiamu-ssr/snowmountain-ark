@@ -12,7 +12,7 @@ const session: Session = {
   id: "sesn-remote", kind: "session", name: "remote", description: "", createdAt: now, updatedAt: now,
   agentId: "agent", agentVersion: 1, environmentId: "env", memoryStoreIds: [], status: "idle",
   inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, workspacePath: "/workspace",
-  resourceConfig: { cpu: 1, memoryMiB: 512, maxRuntimeSeconds: 3600, networkMode: "deny" }
+  resourceConfig: { cpu: 1, memoryMiB: 512, maxRuntimeSeconds: 3600, networkMode: "full" }
 };
 const environment: Environment = {
   id: "env", kind: "environment", name: "env", description: "", createdAt: now, updatedAt: now,

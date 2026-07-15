@@ -56,6 +56,14 @@ flowchart TD
 
 Agent 详情包含基础配置、Sessions 管理、模型配置和监控。模型页展示 endpoint、RPM/TPM、缓存与非缓存输入价格、输出价格。监控接入托管 Prometheus，默认保留近 15 天数据。
 
+### 2026-07-15 模型、Base Agent 与 Vault 复核
+
+- 模型不要求用户填写 Provider URL 或 API Key，而是从火山方舟账号已经开通的模型目录选择。现场观察到 `Doubao-Seed-Evolving`、`Doubao-Seed-2.1-turbo`、`GLM-5.2`、`DeepSeek-V4-pro`、`Doubao-Seed-2.1-pro`，并在右侧选择模型版本。这说明模型供应商接入属于平台/管理员控制面，Agent 作者只固化模型引用。
+- 高级参数只显示一个 `Ark-Managed-Agents-Preview-20260601 · 默认`。结合它位于模型、Prompt、Tool 之外，以及 AgentKit 对“动态 Harness 编排”的公开描述，合理推断 Base Agent 是版本化 Harness/Runtime Profile，而不是另一个业务 Agent。它决定 Agent loop、上下文、Tool 路由、恢复和安全策略的实现版本。
+- Vault 列表页原文是“为 MCP Server 与 Skill ENV 集中托管登录凭证。Agent 只引用名称，方舟代理层动态注入”。因此 Vault 在账号/租户内是可发现的共享资源池，但 Credential 并非自动注入每个 Session；实际使用仍发生在 MCP 或 Skill ENV binding。火山方舟自有模型不经过这个 Vault，因为模型供应商凭证由平台托管。
+
+参考：[Managed Agents 控制台教程](https://www.volcengine.com/docs/82379/2553715?lang=zh)、[火山引擎 AgentKit](https://www.volcengine.com/product/agentkit)。后者公开描述了动态 Harness、Session 内模型/Tool/Skill 热切换、长任务中断恢复、MCP 网关、身份与安全沙箱等能力；它不是本 Beta 私有实现的源码证明，只能作为同一厂商的产品方向证据。
+
 ## Environment 创建页
 
 - 名称；

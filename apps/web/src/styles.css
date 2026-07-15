@@ -141,7 +141,7 @@ tbody tr:hover td { background: #fcfcff; }
 
 .modal-backdrop, .drawer-backdrop { position: fixed; inset: 0; z-index: 100; background: rgba(17,25,42,.38); backdrop-filter: blur(3px); }
 .modal-backdrop { display: grid; place-items: center; padding: 20px; }
-.modal { width: min(540px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: var(--shadow); }
+.modal { width: min(720px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: var(--shadow); }
 .modal > header, .drawer > header { min-height: 55px; display: flex; align-items: center; justify-content: space-between; padding: 0 19px; border-bottom: 1px solid var(--line); }
 .modal h2, .drawer h2 { margin: 0; font-size: 15px; }
 .modal-body, .drawer-body { display: flex; flex-direction: column; gap: 16px; padding: 20px; overflow: auto; }
@@ -173,6 +173,22 @@ input:disabled { color: #9aa3b3; background: #f4f6f9; }
 .advanced-row div span, .advanced-row div strong { display: block; }
 .advanced-row div span { margin-bottom: 4px; color: var(--muted); font-size: 9.5px; }
 .advanced-row div strong { color: #344057; font-size: 11px; }
+.model-selection { width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line-strong); border-radius: 9px; background: #fbfcff; text-align: left; cursor: pointer; }
+.model-selection:hover { border-color: #bfc1fa; background: #f9f9ff; }
+.model-selection strong, .model-selection p, .model-selection small { display: block; }
+.model-selection strong { color: var(--text); font-size: 12px; }
+.model-selection p { margin: 4px 0; color: var(--muted); font-size: 10px; }
+.model-selection small { color: var(--faint); font: 9px "JetBrains Mono", monospace; }
+.model-picker-grid { display: grid; grid-template-columns: 1fr 1.15fr; min-height: 330px; margin: -20px; }
+.model-picker-list { padding: 14px; border-right: 1px solid var(--line); background: #fafbfe; }
+.model-picker-list button { width: 100%; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; margin-bottom: 7px; padding: 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; }
+.model-picker-list button.selected { border-color: #cfd0ff; background: white; box-shadow: 0 3px 10px rgba(30,40,70,.05); }
+.model-picker-list strong, .model-picker-list small { display: block; }
+.model-picker-list strong { font-size: 11px; }
+.model-picker-list small { margin-top: 3px; color: var(--muted); font: 8.5px "JetBrains Mono", monospace; }
+.model-picker-detail { padding: 22px; }
+.model-picker-detail h3 { margin: 0 0 8px; font-size: 16px; }
+.model-picker-detail > div > p { margin: 0 0 18px; color: var(--muted); font-size: 10px; line-height: 1.6; }
 
 .capability-tabs, .detail-tabs { display: flex; align-items: center; gap: 4px; border-bottom: 1px solid var(--line); }
 .capability-tabs button, .detail-tabs button { position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 10px 13px; border: 0; background: transparent; color: #748097; font-size: 11px; font-weight: 600; cursor: pointer; }
@@ -417,6 +433,12 @@ input:disabled { color: #9aa3b3; background: #f4f6f9; }
 .settings-keys h3, .settings-keys p { margin: 0; }
 .settings-keys h3 { font-size: 13px; }
 .settings-keys p { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.admin-section { margin-top: 16px; }
+.admin-section > header { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid var(--line); }
+.admin-section > header h3, .admin-section > header p { margin: 0; }
+.admin-section > header h3 { font-size: 13px; }
+.admin-section > header p { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.block-id { display: block; margin-top: 4px; color: var(--faint); font: 9px "JetBrains Mono", monospace; }
 .one-time-secret { display: grid; gap: 10px; }
 .one-time-secret p { margin: 0; color: var(--muted); font-size: 10px; }
 .one-time-secret code { padding: 12px; border: 1px solid #d8dcff; border-radius: 7px; background: var(--primary-soft); overflow-wrap: anywhere; }

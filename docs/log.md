@@ -7,6 +7,16 @@ timestamp: 2026-07-13T23:58:00+08:00
 
 # 变更日志
 
+## 2026-07-15
+
+- 再次核对火山方舟创建 Agent：确认模型来自平台目录，Base Agent 当前唯一值为 `Ark-Managed-Agents-Preview-20260601`，并据此把 Base Agent 建模为版本化 Runtime Profile。
+- 新增管理员平台管理面：模型 Endpoint/密钥与模型目录、Base Agent Runtime、用户/租户、API Key 和审计；普通用户只看到 Managed Agents 业务资源。
+- 资源表增加 tenantId/ownerId，登录 Session 固定 admin/user 与 tenantId；Agent、Session、Environment、Vault、Credential、Memory、API Key 的列表、单项读取、关联和删除执行租户过滤。
+- Vault 语义调整为租户级共享资源池：Agent 可发现 Credential 名称，但秘密只由 MCP/Skill 代理按 binding 动态解密；平台模型密钥不进入租户 Vault。
+- 命令 Sandbox 默认改为普通 Docker bridge 出网，保留 `networkMode=deny`；文档明确它只控制 bash/glob/grep 命令容器，web_fetch、MCP 和模型调用位于不同代理层。
+- 新增模型选择器与管理员发布目录；生产尚未发布真实 LLM，因此 Wind 分析师暂固定 deterministic-local，界面会诚实标示无真实推理。
+- 新增 `platform.boundary` 高密度 Spec 与 Base Agent Runtime 设计笔记。
+
 ## 2026-07-14
 
 - Market 扩展为多来源 Git 快照：接入 ClawHub 400 条、Official MCP Registry 302 条、Wind AIFin Market 98 条，加上 4 条本地审查样例共 804 条，并补齐来源、分类、验证层级、许可证、访问条件与风险标签。

@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import type { FastifyRequest } from "fastify";
 import type { AuthStatus } from "@snowmountain/contracts";
 import { Store, type AuthSessionRow } from "./db.js";
@@ -7,6 +7,8 @@ interface LoginResult {
   sessionToken: string;
   csrfToken: string;
   expiresAt: string;
+  role: "admin" | "user";
+  tenantId: string;
 }
 
 interface AttemptWindow {
@@ -15,6 +17,10 @@ interface AttemptWindow {
 }
 
 export class LoginRateLimitError extends Error {}
+
+export function passwordDigest(password: string, salt = randomBytes(16).toString("hex")): { salt: string; hash: string } {
+  return { salt, hash: scryptSync(password, salt, 32).toString("hex") };
+}
 
 function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -56,7 +62,16 @@ export class AuthManager {
   login(username: string, password: string, ip: string): LoginResult | undefined {
     if (!this.enabled) return undefined;
     this.enforceRate(ip);
-    if (!equalSecret(username, this.options.username) || !equalSecret(password, this.options.password)) {
+    let principal: { role: "admin" | "user"; tenantId: string } | undefined;
+    if (equalSecret(username, this.options.username) && equalSecret(password, this.options.password)) {
+      principal = { role: "admin", tenantId: "system" };
+    } else {
+      const user = this.store.getUserByUsername(username);
+      if (user?.enabled && equalSecret(passwordDigest(password, user.password_salt).hash, user.password_hash)) {
+        principal = { role: user.role, tenantId: user.tenant_id };
+      }
+    }
+    if (!principal) {
       this.recordFailure(ip);
       return undefined;
     }
@@ -64,8 +79,8 @@ export class AuthManager {
     const sessionToken = randomBytes(32).toString("base64url");
     const csrfToken = randomBytes(24).toString("base64url");
     const expiresAt = new Date(Date.now() + this.options.sessionHours * 60 * 60 * 1000).toISOString();
-    this.store.createAuthSession(digest(sessionToken), username, digest(csrfToken), expiresAt);
-    return { sessionToken, csrfToken, expiresAt };
+    this.store.createAuthSession(digest(sessionToken), username, principal.role, principal.tenantId, digest(csrfToken), expiresAt);
+    return { sessionToken, csrfToken, expiresAt, ...principal };
   }
 
   session(request: FastifyRequest): AuthSessionRow | undefined {
@@ -75,10 +90,10 @@ export class AuthManager {
   }
 
   status(request: FastifyRequest): AuthStatus {
-    if (!this.enabled) return { enabled: false, authenticated: true, user: "local-admin" };
+    if (!this.enabled) return { enabled: false, authenticated: true, user: "local-admin", role: "admin", tenantId: "system" };
     const session = this.session(request);
     return session
-      ? { enabled: true, authenticated: true, user: session.username, expiresAt: session.expires_at }
+      ? { enabled: true, authenticated: true, user: session.username, role: session.role, tenantId: session.tenant_id, expiresAt: session.expires_at }
       : { enabled: true, authenticated: false };
   }
 

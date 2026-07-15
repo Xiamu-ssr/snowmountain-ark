@@ -16,7 +16,8 @@ intent:
 knowledge:
   - docs/notes/anthropic-managed-agents.md
   - docs/notes/anthropic-auto-mode.md
-specRefs: [session.lifecycle, sandbox.boundary, tool.resolution, credential.binding]
+  - docs/notes/base-agent-runtime-and-platform-control.md
+specRefs: [session.lifecycle, sandbox.boundary, tool.resolution, credential.binding, platform.boundary]
 contract:
   role: replaceable-agent-harness
   runtime: bespoke-simple-harness
@@ -29,12 +30,13 @@ contract:
     - { id: tools, direction: out, protocol: policy-gated-tool-call/v1 }
     - { id: evidence, direction: out, protocol: append-only-session-events/v1 }
   features:
+    - { id: runtime-profile, label: Base Agent Runtime Profile 版本化与 Agent 固定引用, status: verified, evidence: apps/api/test/api.test.ts }
     - { id: deterministic-mode, label: 确定性无 LLM 验收模式, status: verified, evidence: apps/api/test/api.test.ts }
     - { id: openai-loop, label: OpenAI-compatible 模型与 Tool 循环, status: implemented, evidence: apps/api/src/harness.ts }
     - { id: sdk-adapter, label: Claude Agent SDK 或 OpenCode Runtime Adapter, status: planned }
     - { id: context-compaction, label: Runtime 上下文压缩, status: planned }
   limitations:
-    - 生产环境当前未配置模型 Credential；线上验收 Agent 使用 deterministic-local。
+    - 生产环境当前只发布 deterministic-local 模型目录项；管理员尚未配置真实 LLM Endpoint。
     - 自研循环尚不具备完整 Agent SDK 已成熟的上下文管理、子 Agent 易用性与兼容能力面。
 implementation:
   code:
@@ -51,3 +53,4 @@ verification:
   assertions:
     - { id: stable-evidence, assertion: 确定性路径与外部模型路径必须产生相同的事件契约。 }
     - { id: replaceable-runtime, assertion: 替换模型 Adapter 不得改变 Session 身份或 Workspace 所有权。 }
+    - { id: base-agent-is-runtime, assertion: Base Agent 选择 Runtime Profile，不得与 LLM 模型或业务子 Agent 混为一谈。 }

@@ -2,6 +2,7 @@ import type {
   Agent,
   Environment,
   MemoryStore,
+  ModelEndpoint,
   Session,
   SessionEvent,
   ToolCall,
@@ -14,6 +15,7 @@ import { decidePolicy } from "./policy.js";
 import { Sandbox } from "./sandbox.js";
 import type { AgentRuntime } from "./runtime.js";
 import { effectiveBuiltinTools } from "./tools.js";
+import { openSecret } from "./vault.js";
 
 interface TextPayload {
   content: string;
@@ -219,11 +221,14 @@ export class Harness implements AgentRuntime {
   }
 
   private async runOpenAICompatible(session: Session, agent: Agent, environment: Environment, signal: AbortSignal): Promise<void> {
-    const apiKey = agent.model.credentialId
+    const platformEndpoint = agent.model.endpointId ? this.store.get<ModelEndpoint>(agent.model.endpointId, "system") : undefined;
+    const apiKey = platformEndpoint?.apiKeyCiphertext
+      ? openSecret(platformEndpoint.apiKeyCiphertext)
+      : agent.model.credentialId
       ? await this.mcp.resolveCredential(agent.model.credentialId)
       : process.env.MODEL_API_KEY;
-    if (!apiKey) throw new Error("OpenAI-compatible Agent 必须显式绑定模型 Credential，或由管理员配置系统默认 MODEL_API_KEY");
-    const baseUrl = (agent.model.baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
+    if (!apiKey) throw new Error("管理员尚未为所选模型 Endpoint 配置凭证");
+    const baseUrl = (platformEndpoint?.baseUrl ?? agent.model.baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
     const history = this.store.events(session.id, 0, 500);
     const memory = this.memoryContext(session);
     const mcpCatalog = await this.mcp.listTools(agent);
@@ -336,11 +341,14 @@ export class Harness implements AgentRuntime {
     if (subagent.model.provider === "mock") {
       content = `${subagent.name}（V${subagent.version}）已独立审阅任务：${task}\n这是本地确定性子 Agent 结果，父 Agent 必须用工具证据复核。`;
     } else {
-      const apiKey = subagent.model.credentialId
+      const platformEndpoint = subagent.model.endpointId ? this.store.get<ModelEndpoint>(subagent.model.endpointId, "system") : undefined;
+      const apiKey = platformEndpoint?.apiKeyCiphertext
+        ? openSecret(platformEndpoint.apiKeyCiphertext)
+        : subagent.model.credentialId
         ? await this.mcp.resolveCredential(subagent.model.credentialId)
         : process.env.MODEL_API_KEY;
-      if (!apiKey) throw new Error("OpenAI-compatible 子 Agent 必须显式绑定模型 Credential，或由管理员配置系统默认 MODEL_API_KEY");
-      const baseUrl = (subagent.model.baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
+      if (!apiKey) throw new Error("管理员尚未为子 Agent 所选模型 Endpoint 配置凭证");
+      const baseUrl = (platformEndpoint?.baseUrl ?? subagent.model.baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },

@@ -159,6 +159,73 @@ test("protects the control plane with login cookies, CSRF and audit events", asy
   }
 });
 
+test("isolates managed resources by tenant while administrators retain platform visibility", async () => {
+  const root = await mkdtemp(join(tmpdir(), "snowmountain-tenants-"));
+  const app = await buildApp({
+    databasePath: join(root, "test.db"), dataDir: root, seed: true,
+    auth: { username: "admin", password: "correct-horse-battery-staple", cookiePath: "/" }
+  });
+  const login = async (username: string, password: string) => {
+    const response = await app.inject({ method: "POST", url: "/v1/auth/login", payload: { username, password } });
+    assert.equal(response.statusCode, 200, response.body);
+    const values = Array.isArray(response.headers["set-cookie"]) ? response.headers["set-cookie"] : [String(response.headers["set-cookie"] ?? "")];
+    const cookie = values.map((value) => value.split(";", 1)[0]).join("; ");
+    const csrf = decodeURIComponent(/sm_ark_csrf=([^;]+)/.exec(cookie)?.[1] ?? "");
+    return { cookie, csrf };
+  };
+  try {
+    const admin = await login("admin", "correct-horse-battery-staple");
+    for (const user of [
+      { username: "alice", password: "tenant-alpha-password", tenantId: "tenant-alpha" },
+      { username: "bob", password: "tenant-bravo-password", tenantId: "tenant-bravo" }
+    ]) {
+      const created = await app.inject({ method: "POST", url: "/v1/admin/users", headers: { cookie: admin.cookie, "x-csrf-token": admin.csrf }, payload: user });
+      assert.equal(created.statusCode, 201, created.body);
+    }
+    const alice = await login("alice", "tenant-alpha-password");
+    const aliceVault = await app.inject({ method: "POST", url: "/v1/vaults", headers: { cookie: alice.cookie, "x-csrf-token": alice.csrf }, payload: { name: "Alice Vault" } });
+    assert.equal(aliceVault.statusCode, 201, aliceVault.body);
+    assert.equal(aliceVault.json().tenantId, "tenant-alpha");
+
+    const bob = await login("bob", "tenant-bravo-password");
+    const bobVaults = await app.inject({ method: "GET", url: "/v1/vaults", headers: { cookie: bob.cookie } });
+    assert.deepEqual(bobVaults.json().items, []);
+    const crossTenantRead = await app.inject({ method: "GET", url: `/v1/vaults/${aliceVault.json().id}`, headers: { cookie: bob.cookie } });
+    assert.equal(crossTenantRead.statusCode, 404);
+    const crossTenantDelete = await app.inject({ method: "DELETE", url: `/v1/vaults/${aliceVault.json().id}`, headers: { cookie: bob.cookie, "x-csrf-token": bob.csrf } });
+    assert.equal(crossTenantDelete.statusCode, 404);
+
+    const adminVaults = await app.inject({ method: "GET", url: "/v1/vaults", headers: { cookie: admin.cookie } });
+    assert.ok(adminVaults.json().items.some((vault: { id: string }) => vault.id === aliceVault.json().id));
+  } finally {
+    await app.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("publishes administrator-managed models and Runtime profiles to Agent creators", async () => {
+  const root = await mkdtemp(join(tmpdir(), "snowmountain-model-catalog-"));
+  const app = await buildApp({ databasePath: join(root, "test.db"), dataDir: root, seed: true });
+  try {
+    const models = (await app.inject({ method: "GET", url: "/v1/model-catalog" })).json<{ items: Array<{ id: string; endpointId: string; name: string; provider: string }> }>().items;
+    const runtimes = (await app.inject({ method: "GET", url: "/v1/runtime-profiles" })).json<{ items: Array<{ id: string; default: boolean }> }>().items;
+    assert.ok(models.some((model) => model.name === "deterministic-local-harness"));
+    assert.ok(runtimes.some((runtime) => runtime.default));
+    const selected = models[0]!;
+    const runtime = runtimes.find((item) => item.default)!;
+    const agent = await app.inject({
+      method: "POST", url: "/v1/agents",
+      payload: { name: "catalog-agent", model: { provider: selected.provider, name: selected.name, endpointId: selected.endpointId }, baseAgent: runtime.id }
+    });
+    assert.equal(agent.statusCode, 201, agent.body);
+    assert.equal(agent.json().model.endpointId, selected.endpointId);
+    assert.equal(agent.json().baseAgent, runtime.id);
+  } finally {
+    await app.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("recovers in-flight Sessions after a control-plane restart", async () => {
   const root = await mkdtemp(join(tmpdir(), "snowmountain-recovery-"));
   const databasePath = join(root, "test.db");

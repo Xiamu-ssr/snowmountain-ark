@@ -12,13 +12,13 @@
   "source": "spec/contracts/*.yaml",
   "schema": "spec/schema/snowmountain-spec.schema.json",
   "summary": {
-    "specs": 8,
-    "features": 17,
+    "specs": 9,
+    "features": 24,
     "statuses": {
       "planned": 2,
       "partial": 5,
       "implemented": 5,
-      "verified": 13,
+      "verified": 21,
       "deprecated": 0
     }
   },
@@ -51,13 +51,15 @@
       },
       "knowledge": [
         "docs/notes/anthropic-managed-agents.md",
-        "docs/notes/anthropic-auto-mode.md"
+        "docs/notes/anthropic-auto-mode.md",
+        "docs/notes/base-agent-runtime-and-platform-control.md"
       ],
       "specRefs": [
         "session.lifecycle",
         "sandbox.boundary",
         "tool.resolution",
-        "credential.binding"
+        "credential.binding",
+        "platform.boundary"
       ],
       "contract": {
         "role": "replaceable-agent-harness",
@@ -96,6 +98,12 @@
         ],
         "features": [
           {
+            "id": "runtime-profile",
+            "label": "Base Agent Runtime Profile 版本化与 Agent 固定引用",
+            "status": "verified",
+            "evidence": "apps/api/test/api.test.ts"
+          },
+          {
             "id": "deterministic-mode",
             "label": "确定性无 LLM 验收模式",
             "status": "verified",
@@ -119,7 +127,7 @@
           }
         ],
         "limitations": [
-          "生产环境当前未配置模型 Credential；线上验收 Agent 使用 deterministic-local。",
+          "生产环境当前只发布 deterministic-local 模型目录项；管理员尚未配置真实 LLM Endpoint。",
           "自研循环尚不具备完整 Agent SDK 已成熟的上下文管理、子 Agent 易用性与兼容能力面。"
         ]
       },
@@ -147,11 +155,15 @@
           {
             "id": "replaceable-runtime",
             "assertion": "替换模型 Adapter 不得改变 Session 身份或 Workspace 所有权。"
+          },
+          {
+            "id": "base-agent-is-runtime",
+            "assertion": "Base Agent 选择 Runtime Profile，不得与 LLM 模型或业务子 Agent 混为一谈。"
           }
         ]
       },
       "sourcePath": "spec/contracts/agent-runtime.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: agent.runtime\n  title: Agent 运行时与模型工具循环\n  status: partial\n  owners: [agent-runtime]\n  tags: [harness, model, tools]\nintent:\n  summary: 保持 Session、Tool 与证据契约稳定，同时允许替换模型和 Agent Runtime 实现。\n  outcomes:\n    - 确定性测试无需外部 LLM。\n    - OpenAI-compatible Endpoint 通过同一 Policy 与事件面执行有上限的 Tool 循环。\n  nonGoals:\n    - 把当前自研 Harness 描述成与 Claude Agent SDK 或 OpenCode 功能等价。\nknowledge:\n  - docs/notes/anthropic-managed-agents.md\n  - docs/notes/anthropic-auto-mode.md\nspecRefs: [session.lifecycle, sandbox.boundary, tool.resolution, credential.binding]\ncontract:\n  role: replaceable-agent-harness\n  runtime: bespoke-simple-harness\n  adapters:\n    - { id: deterministic-local, label: 不调用 LLM 的本地确定性 Harness }\n    - { id: openai-compatible, label: OpenAI-compatible Chat Completions Tool 循环 }\n  ports:\n    - { id: interaction, direction: in, protocol: durable-interaction-job/v1 }\n    - { id: model, direction: out, protocol: openai-chat-completions-compatible }\n    - { id: tools, direction: out, protocol: policy-gated-tool-call/v1 }\n    - { id: evidence, direction: out, protocol: append-only-session-events/v1 }\n  features:\n    - { id: deterministic-mode, label: 确定性无 LLM 验收模式, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: openai-loop, label: OpenAI-compatible 模型与 Tool 循环, status: implemented, evidence: apps/api/src/harness.ts }\n    - { id: sdk-adapter, label: Claude Agent SDK 或 OpenCode Runtime Adapter, status: planned }\n    - { id: context-compaction, label: Runtime 上下文压缩, status: planned }\n  limitations:\n    - 生产环境当前未配置模型 Credential；线上验收 Agent 使用 deterministic-local。\n    - 自研循环尚不具备完整 Agent SDK 已成熟的上下文管理、子 Agent 易用性与兼容能力面。\nimplementation:\n  code:\n    - apps/api/src/runtime.ts\n    - apps/api/src/harness.ts\n    - apps/api/src/mcp.ts\n    - apps/api/src/policy.ts\n  notes:\n    - Runtime Adapter 绝不能绕过 Policy、Sandbox、Vault 代理或 Session 事件。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/api/test/mcp.test.ts\n  assertions:\n    - { id: stable-evidence, assertion: 确定性路径与外部模型路径必须产生相同的事件契约。 }\n    - { id: replaceable-runtime, assertion: 替换模型 Adapter 不得改变 Session 身份或 Workspace 所有权。 }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: agent.runtime\n  title: Agent 运行时与模型工具循环\n  status: partial\n  owners: [agent-runtime]\n  tags: [harness, model, tools]\nintent:\n  summary: 保持 Session、Tool 与证据契约稳定，同时允许替换模型和 Agent Runtime 实现。\n  outcomes:\n    - 确定性测试无需外部 LLM。\n    - OpenAI-compatible Endpoint 通过同一 Policy 与事件面执行有上限的 Tool 循环。\n  nonGoals:\n    - 把当前自研 Harness 描述成与 Claude Agent SDK 或 OpenCode 功能等价。\nknowledge:\n  - docs/notes/anthropic-managed-agents.md\n  - docs/notes/anthropic-auto-mode.md\n  - docs/notes/base-agent-runtime-and-platform-control.md\nspecRefs: [session.lifecycle, sandbox.boundary, tool.resolution, credential.binding, platform.boundary]\ncontract:\n  role: replaceable-agent-harness\n  runtime: bespoke-simple-harness\n  adapters:\n    - { id: deterministic-local, label: 不调用 LLM 的本地确定性 Harness }\n    - { id: openai-compatible, label: OpenAI-compatible Chat Completions Tool 循环 }\n  ports:\n    - { id: interaction, direction: in, protocol: durable-interaction-job/v1 }\n    - { id: model, direction: out, protocol: openai-chat-completions-compatible }\n    - { id: tools, direction: out, protocol: policy-gated-tool-call/v1 }\n    - { id: evidence, direction: out, protocol: append-only-session-events/v1 }\n  features:\n    - { id: runtime-profile, label: Base Agent Runtime Profile 版本化与 Agent 固定引用, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: deterministic-mode, label: 确定性无 LLM 验收模式, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: openai-loop, label: OpenAI-compatible 模型与 Tool 循环, status: implemented, evidence: apps/api/src/harness.ts }\n    - { id: sdk-adapter, label: Claude Agent SDK 或 OpenCode Runtime Adapter, status: planned }\n    - { id: context-compaction, label: Runtime 上下文压缩, status: planned }\n  limitations:\n    - 生产环境当前只发布 deterministic-local 模型目录项；管理员尚未配置真实 LLM Endpoint。\n    - 自研循环尚不具备完整 Agent SDK 已成熟的上下文管理、子 Agent 易用性与兼容能力面。\nimplementation:\n  code:\n    - apps/api/src/runtime.ts\n    - apps/api/src/harness.ts\n    - apps/api/src/mcp.ts\n    - apps/api/src/policy.ts\n  notes:\n    - Runtime Adapter 绝不能绕过 Policy、Sandbox、Vault 代理或 Session 事件。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/api/test/mcp.test.ts\n  assertions:\n    - { id: stable-evidence, assertion: 确定性路径与外部模型路径必须产生相同的事件契约。 }\n    - { id: replaceable-runtime, assertion: 替换模型 Adapter 不得改变 Session 身份或 Workspace 所有权。 }\n    - { id: base-agent-is-runtime, assertion: Base Agent 选择 Runtime Profile，不得与 LLM 模型或业务子 Agent 混为一谈。 }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -188,7 +200,8 @@
         "memory.lifecycle",
         "market.integration",
         "tool.resolution",
-        "credential.binding"
+        "credential.binding",
+        "platform.boundary"
       ],
       "contract": {
         "role": "human-and-api-control-plane",
@@ -212,6 +225,18 @@
           }
         ],
         "features": [
+          {
+            "id": "tenancy",
+            "label": "管理员/普通用户角色与 tenantId 数据隔离",
+            "status": "verified",
+            "evidence": "apps/api/test/api.test.ts"
+          },
+          {
+            "id": "model-catalog",
+            "label": "管理员模型 Endpoint 与普通用户模型选择器",
+            "status": "verified",
+            "evidence": "apps/api/test/api.test.ts"
+          },
           {
             "id": "agents",
             "label": "Agent 与不可变版本",
@@ -298,7 +323,7 @@
         ]
       },
       "sourcePath": "spec/contracts/control-plane-capabilities.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: control-plane.capabilities\n  title: Managed Agents 中台能力全景图\n  status: partial\n  owners: [control-plane]\n  tags: [ui, api, parity]\nintent:\n  summary: 用可审查的高密度投影向人类展示已验证、部分实现和规划中的平台能力。\n  outcomes:\n    - 进度来自结构化状态与验证证据，不要求人类阅读大量 Markdown 后自行推测。\n  nonGoals:\n    - 因为存在页面或路由就声称已经完整对齐火山方舟。\nknowledge:\n  - docs/notes/volcengine-managed-agents-reverse-engineering.md\nspecRefs: [session.lifecycle, sandbox.boundary, agent.runtime, memory.lifecycle, market.integration, tool.resolution, credential.binding]\ncontract:\n  role: human-and-api-control-plane\n  runtime: fastify-react-sqlite\n  adapters: []\n  ports:\n    - { id: human-console, direction: in, protocol: https-react }\n    - { id: control-api, direction: in, protocol: authenticated-rest }\n    - { id: data-api, direction: in, protocol: bearer-rest }\n  features:\n    - { id: agents, label: Agent 与不可变版本, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: sessions, label: \"Session、持久队列、审批与事件回放\", status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: environments, label: Environment 依赖与普通变量, status: implemented, evidence: apps/web/src/pages/Resources.tsx }\n    - { id: vault, label: Credential Vault、显式绑定与 OAuth 刷新, status: verified, evidence: apps/api/test/mcp.test.ts }\n    - { id: memory, label: 显式长期 Memory Store, status: partial, evidence: spec/contracts/memory-lifecycle.yaml }\n    - { id: market, label: Git-first Market 集成, status: implemented, evidence: spec/contracts/market-integration.yaml }\n    - { id: sandbox, label: 可替换的隔离执行后端, status: verified, evidence: apps/worker/test/worker.test.ts }\n    - { id: runtime, label: 生产级 Agent SDK Runtime, status: partial, evidence: spec/contracts/agent-runtime.yaml }\n    - { id: observability, label: \"审计、事件与 Prometheus 指标\", status: implemented, evidence: apps/api/src/app.ts }\n  limitations:\n    - UI 对齐不代表已经复刻火山方舟未公开的服务端行为。\n    - Runtime SDK 选型、Memory 自动抽取和强于 runc 的隔离仍是明确的开放契约。\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/web/src/App.tsx\n  notes:\n    - 规范查看器是开发者投影，不是 Managed Agents 业务模块。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/worker/test/worker.test.ts\n  assertions:\n    - { id: honest-status, assertion: 部分实现、已实现和已验证能力必须在界面中清楚区分。 }\n    - { id: viewer-separation, assertion: Managed Agents 业务侧栏不得包含 SDD 或项目文档栏目。 }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: control-plane.capabilities\n  title: Managed Agents 中台能力全景图\n  status: partial\n  owners: [control-plane]\n  tags: [ui, api, parity]\nintent:\n  summary: 用可审查的高密度投影向人类展示已验证、部分实现和规划中的平台能力。\n  outcomes:\n    - 进度来自结构化状态与验证证据，不要求人类阅读大量 Markdown 后自行推测。\n  nonGoals:\n    - 因为存在页面或路由就声称已经完整对齐火山方舟。\nknowledge:\n  - docs/notes/volcengine-managed-agents-reverse-engineering.md\nspecRefs: [session.lifecycle, sandbox.boundary, agent.runtime, memory.lifecycle, market.integration, tool.resolution, credential.binding, platform.boundary]\ncontract:\n  role: human-and-api-control-plane\n  runtime: fastify-react-sqlite\n  adapters: []\n  ports:\n    - { id: human-console, direction: in, protocol: https-react }\n    - { id: control-api, direction: in, protocol: authenticated-rest }\n    - { id: data-api, direction: in, protocol: bearer-rest }\n  features:\n    - { id: tenancy, label: 管理员/普通用户角色与 tenantId 数据隔离, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: model-catalog, label: 管理员模型 Endpoint 与普通用户模型选择器, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: agents, label: Agent 与不可变版本, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: sessions, label: \"Session、持久队列、审批与事件回放\", status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: environments, label: Environment 依赖与普通变量, status: implemented, evidence: apps/web/src/pages/Resources.tsx }\n    - { id: vault, label: Credential Vault、显式绑定与 OAuth 刷新, status: verified, evidence: apps/api/test/mcp.test.ts }\n    - { id: memory, label: 显式长期 Memory Store, status: partial, evidence: spec/contracts/memory-lifecycle.yaml }\n    - { id: market, label: Git-first Market 集成, status: implemented, evidence: spec/contracts/market-integration.yaml }\n    - { id: sandbox, label: 可替换的隔离执行后端, status: verified, evidence: apps/worker/test/worker.test.ts }\n    - { id: runtime, label: 生产级 Agent SDK Runtime, status: partial, evidence: spec/contracts/agent-runtime.yaml }\n    - { id: observability, label: \"审计、事件与 Prometheus 指标\", status: implemented, evidence: apps/api/src/app.ts }\n  limitations:\n    - UI 对齐不代表已经复刻火山方舟未公开的服务端行为。\n    - Runtime SDK 选型、Memory 自动抽取和强于 runc 的隔离仍是明确的开放契约。\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/web/src/App.tsx\n  notes:\n    - 规范查看器是开发者投影，不是 Managed Agents 业务模块。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/worker/test/worker.test.ts\n  assertions:\n    - { id: honest-status, assertion: 部分实现、已实现和已验证能力必须在界面中清楚区分。 }\n    - { id: viewer-separation, assertion: Managed Agents 业务侧栏不得包含 SDD 或项目文档栏目。 }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -318,15 +343,15 @@
         ]
       },
       "intent": {
-        "summary": "消除“Vault 默认对所有 Agent 可用”的隐式契约，任何秘密使用都必须存在可审计的显式引用。",
+        "summary": "Vault 是租户级可发现资源池，但任何秘密使用都必须存在可审计的 MCP/Skill 引用；平台模型秘密属于管理员控制面。",
         "outcomes": [
-          "Vault 只是 Credential 的加密容器，不直接绑定 Environment 或 Session。",
-          "模型 Credential 由 Agent ModelConfig.credentialId 显式选择。",
+          "Vault 是当前 tenant 的 Credential 加密容器，不直接绑定 Environment 或 Session。",
+          "模型 Provider Credential 由管理员 Model Endpoint 托管，普通用户只选择模型目录项。",
           "MCP Credential 由 Agent McpServerBinding.credentialId 显式选择。",
           "Environment 不接受 secret 变量，Sandbox 永远不接收 Vault 明文。"
         ],
         "nonGoals": [
-          "把 Vault 内容注入模型上下文或 Sandbox 环境变量。"
+          "把 Vault 或平台模型 Endpoint 的秘密注入模型上下文或 Sandbox 环境变量。"
         ]
       },
       "knowledge": [
@@ -339,6 +364,10 @@
       ],
       "contract": {
         "subjects": [
+          {
+            "id": "platform-admin",
+            "label": "平台模型与 Runtime 管理员"
+          },
           {
             "id": "agent-version",
             "label": "固定能力引用的 Agent Version"
@@ -362,6 +391,10 @@
         ],
         "resources": [
           {
+            "id": "model-endpoint-secret",
+            "label": "平台模型 Endpoint 密钥"
+          },
+          {
             "id": "credential-reference",
             "label": "非秘密 Credential ID"
           },
@@ -375,6 +408,11 @@
           }
         ],
         "grants": [
+          {
+            "subject": "platform-admin",
+            "resource": "model-endpoint-secret",
+            "access": "write"
+          },
           {
             "subject": "agent-version",
             "resource": "credential-reference",
@@ -419,6 +457,11 @@
             "subject": "sandbox",
             "resource": "vault-secret",
             "access": "none"
+          },
+          {
+            "subject": "sandbox",
+            "resource": "model-endpoint-secret",
+            "access": "none"
           }
         ],
         "constraints": [
@@ -444,7 +487,7 @@
           "apps/web/src/pages/Agents.tsx"
         ],
         "notes": [
-          "管理员级 MODEL_API_KEY 是独立的系统默认模型配置，不属于 Vault；选择 Vault Credential 时优先使用显式 Agent binding。"
+          "历史 MODEL_API_KEY 与 Agent.model.credentialId 仅作兼容路径；普通用户界面只选择管理员发布的 Model Endpoint。"
         ]
       },
       "verification": {
@@ -461,11 +504,15 @@
           {
             "id": "no-environment-secret",
             "assertion": "API 拒绝 secret Environment variable，Sandbox 也会防御性过滤旧数据。"
+          },
+          {
+            "id": "tenant-vault",
+            "assertion": "普通用户不能列出、读取或删除其他 tenant 的 Vault/Credential。"
           }
         ]
       },
       "sourcePath": "spec/contracts/credential-binding.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: capability-policy\nmetadata:\n  id: credential.binding\n  title: Vault Credential 显式绑定与秘密解析边界\n  status: verified\n  owners: [runtime-security]\n  tags: [vault, credential, agent-version, environment]\nintent:\n  summary: 消除“Vault 默认对所有 Agent 可用”的隐式契约，任何秘密使用都必须存在可审计的显式引用。\n  outcomes:\n    - Vault 只是 Credential 的加密容器，不直接绑定 Environment 或 Session。\n    - 模型 Credential 由 Agent ModelConfig.credentialId 显式选择。\n    - MCP Credential 由 Agent McpServerBinding.credentialId 显式选择。\n    - Environment 不接受 secret 变量，Sandbox 永远不接收 Vault 明文。\n  nonGoals:\n    - 把 Vault 内容注入模型上下文或 Sandbox 环境变量。\nknowledge:\n  - docs/notes/runtime-sandbox-memory-decisions.md\nspecRefs: [sandbox.boundary, agent.runtime, session.lifecycle]\ncontract:\n  subjects:\n    - { id: agent-version, label: 固定能力引用的 Agent Version }\n    - { id: credential-proxy, label: 控制面 Credential 代理 }\n    - { id: session, label: Session 运行记录 }\n    - { id: environment, label: 可复现依赖与普通变量模板 }\n    - { id: sandbox, label: 不可信 Tool 执行容器 }\n  resources:\n    - { id: credential-reference, label: 非秘密 Credential ID }\n    - { id: vault-secret, label: Vault 加密秘密明文 }\n    - { id: environment-variable, label: Environment 普通变量 }\n  grants:\n    - { subject: agent-version, resource: credential-reference, access: read }\n    - { subject: agent-version, resource: vault-secret, access: none }\n    - { subject: credential-proxy, resource: vault-secret, access: read }\n    - { subject: session, resource: credential-reference, access: none }\n    - { subject: session, resource: vault-secret, access: none }\n    - { subject: environment, resource: environment-variable, access: write }\n    - { subject: environment, resource: vault-secret, access: none }\n    - { subject: sandbox, resource: environment-variable, access: read }\n    - { subject: sandbox, resource: vault-secret, access: none }\n  constraints:\n    - id: reference-is-not-secret\n      type: mutually-exclusive\n      resources: [credential-reference, vault-secret]\n      assertion: 除控制面 Credential 代理外，任何主体都不能同时持有引用和秘密；代理本身不进入模型或 Sandbox。\nimplementation:\n  code:\n    - apps/api/src/vault.ts\n    - apps/api/src/mcp.ts\n    - apps/api/src/harness.ts\n    - apps/api/src/app.ts\n    - apps/api/src/sandbox.ts\n    - apps/web/src/pages/Resources.tsx\n    - apps/web/src/pages/Agents.tsx\n  notes:\n    - 管理员级 MODEL_API_KEY 是独立的系统默认模型配置，不属于 Vault；选择 Vault Credential 时优先使用显式 Agent binding。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/api/test/mcp.test.ts\n    - apps/api/test/sandbox.test.ts\n  assertions:\n    - { id: explicit-reference, assertion: 删除被 Agent 模型或 MCP binding 引用的 Credential 会因依赖边被拒绝。 }\n    - { id: no-environment-secret, assertion: API 拒绝 secret Environment variable，Sandbox 也会防御性过滤旧数据。 }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: capability-policy\nmetadata:\n  id: credential.binding\n  title: Vault Credential 显式绑定与秘密解析边界\n  status: verified\n  owners: [runtime-security]\n  tags: [vault, credential, agent-version, environment]\nintent:\n  summary: Vault 是租户级可发现资源池，但任何秘密使用都必须存在可审计的 MCP/Skill 引用；平台模型秘密属于管理员控制面。\n  outcomes:\n    - Vault 是当前 tenant 的 Credential 加密容器，不直接绑定 Environment 或 Session。\n    - 模型 Provider Credential 由管理员 Model Endpoint 托管，普通用户只选择模型目录项。\n    - MCP Credential 由 Agent McpServerBinding.credentialId 显式选择。\n    - Environment 不接受 secret 变量，Sandbox 永远不接收 Vault 明文。\n  nonGoals:\n    - 把 Vault 或平台模型 Endpoint 的秘密注入模型上下文或 Sandbox 环境变量。\nknowledge:\n  - docs/notes/runtime-sandbox-memory-decisions.md\nspecRefs: [sandbox.boundary, agent.runtime, session.lifecycle]\ncontract:\n  subjects:\n    - { id: platform-admin, label: 平台模型与 Runtime 管理员 }\n    - { id: agent-version, label: 固定能力引用的 Agent Version }\n    - { id: credential-proxy, label: 控制面 Credential 代理 }\n    - { id: session, label: Session 运行记录 }\n    - { id: environment, label: 可复现依赖与普通变量模板 }\n    - { id: sandbox, label: 不可信 Tool 执行容器 }\n  resources:\n    - { id: model-endpoint-secret, label: 平台模型 Endpoint 密钥 }\n    - { id: credential-reference, label: 非秘密 Credential ID }\n    - { id: vault-secret, label: Vault 加密秘密明文 }\n    - { id: environment-variable, label: Environment 普通变量 }\n  grants:\n    - { subject: platform-admin, resource: model-endpoint-secret, access: write }\n    - { subject: agent-version, resource: credential-reference, access: read }\n    - { subject: agent-version, resource: vault-secret, access: none }\n    - { subject: credential-proxy, resource: vault-secret, access: read }\n    - { subject: session, resource: credential-reference, access: none }\n    - { subject: session, resource: vault-secret, access: none }\n    - { subject: environment, resource: environment-variable, access: write }\n    - { subject: environment, resource: vault-secret, access: none }\n    - { subject: sandbox, resource: environment-variable, access: read }\n    - { subject: sandbox, resource: vault-secret, access: none }\n    - { subject: sandbox, resource: model-endpoint-secret, access: none }\n  constraints:\n    - id: reference-is-not-secret\n      type: mutually-exclusive\n      resources: [credential-reference, vault-secret]\n      assertion: 除控制面 Credential 代理外，任何主体都不能同时持有引用和秘密；代理本身不进入模型或 Sandbox。\nimplementation:\n  code:\n    - apps/api/src/vault.ts\n    - apps/api/src/mcp.ts\n    - apps/api/src/harness.ts\n    - apps/api/src/app.ts\n    - apps/api/src/sandbox.ts\n    - apps/web/src/pages/Resources.tsx\n    - apps/web/src/pages/Agents.tsx\n  notes:\n    - 历史 MODEL_API_KEY 与 Agent.model.credentialId 仅作兼容路径；普通用户界面只选择管理员发布的 Model Endpoint。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/api/test/mcp.test.ts\n    - apps/api/test/sandbox.test.ts\n  assertions:\n    - { id: explicit-reference, assertion: 删除被 Agent 模型或 MCP binding 引用的 Credential 会因依赖边被拒绝。 }\n    - { id: no-environment-secret, assertion: API 拒绝 secret Environment variable，Sandbox 也会防御性过滤旧数据。 }\n    - { id: tenant-vault, assertion: 普通用户不能列出、读取或删除其他 tenant 的 Vault/Credential。 }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -635,6 +682,137 @@
     },
     {
       "dsl": "snowmountain.spec/v1",
+      "kind": "component",
+      "metadata": {
+        "id": "platform.boundary",
+        "title": "平台管理员、普通用户与租户数据边界",
+        "status": "verified",
+        "owners": [
+          "control-plane",
+          "runtime-security"
+        ],
+        "tags": [
+          "admin",
+          "user",
+          "tenant",
+          "model-catalog",
+          "runtime-profile"
+        ]
+      },
+      "intent": {
+        "summary": "把平台模型与 Runtime 运维从 Managed Agents 用户界面分离，并用 tenantId 隔离用户资源。",
+        "outcomes": [
+          "管理员管理模型 Endpoint、平台密钥、Runtime Profile、用户、租户和审计。",
+          "普通用户只选择已发布模型与 Base Agent，并管理本 tenant 的业务资源。",
+          "Agent、Session、Environment、Vault、Credential、Memory 与 API Key 都执行相同租户过滤。"
+        ],
+        "nonGoals": [
+          "让普通用户读取 Provider Base URL、平台 API Key 或其他 tenant 数据。"
+        ]
+      },
+      "knowledge": [
+        "docs/notes/base-agent-runtime-and-platform-control.md",
+        "docs/notes/volcengine-managed-agents-reverse-engineering.md"
+      ],
+      "specRefs": [
+        "agent.runtime",
+        "credential.binding",
+        "session.lifecycle"
+      ],
+      "contract": {
+        "role": "tenant-aware-platform-control",
+        "runtime": "fastify-react-sqlite",
+        "adapters": [
+          {
+            "id": "admin-console",
+            "label": "平台模型、Runtime、用户与审计管理"
+          },
+          {
+            "id": "managed-agents-console",
+            "label": "tenant 范围内的 Agent、Session 与资源管理"
+          }
+        ],
+        "ports": [
+          {
+            "id": "admin-api",
+            "direction": "in",
+            "protocol": "admin-session-cookie/v1"
+          },
+          {
+            "id": "user-api",
+            "direction": "in",
+            "protocol": "tenant-session-cookie/v1"
+          },
+          {
+            "id": "model-catalog",
+            "direction": "out",
+            "protocol": "published-model-catalog/v1"
+          }
+        ],
+        "features": [
+          {
+            "id": "role-session",
+            "label": "登录 Session 固定 admin/user 角色与 tenantId",
+            "status": "verified",
+            "evidence": "apps/api/test/api.test.ts"
+          },
+          {
+            "id": "resource-scope",
+            "label": "列表、单项、关联与删除统一 tenant 过滤",
+            "status": "verified",
+            "evidence": "apps/api/test/api.test.ts"
+          },
+          {
+            "id": "admin-models",
+            "label": "管理员发布 Model Endpoint，用户只看模型目录",
+            "status": "verified",
+            "evidence": "apps/web/src/pages/Settings.tsx"
+          },
+          {
+            "id": "runtime-profiles",
+            "label": "管理员发布 Base Agent Runtime Profile",
+            "status": "verified",
+            "evidence": "apps/api/src/app.ts"
+          }
+        ],
+        "limitations": [
+          "当前管理员可跨租户运维；尚未实现细粒度组织角色、项目空间、邀请和 SSO。",
+          "SQLite 适合当前单节点 Beta；横向扩展前需迁移到支持行级安全策略的数据库。"
+        ]
+      },
+      "implementation": {
+        "code": [
+          "apps/api/src/auth.ts",
+          "apps/api/src/db.ts",
+          "apps/api/src/app.ts",
+          "apps/web/src/components/Auth.tsx",
+          "apps/web/src/pages/Settings.tsx",
+          "apps/web/src/pages/Agents.tsx"
+        ],
+        "notes": [
+          "平台 Model Endpoint 的密钥与租户 Vault 分开保存；Agent Version 只持有 endpointId + modelId。"
+        ]
+      },
+      "verification": {
+        "tests": [
+          "apps/api/test/api.test.ts"
+        ],
+        "assertions": [
+          {
+            "id": "cross-tenant-hidden",
+            "assertion": "普通用户对其他 tenant 资源的列表、单项读取和删除都得不到资源存在性。"
+          },
+          {
+            "id": "admin-only-secrets",
+            "assertion": "普通用户 API 不返回平台模型 Base URL 或密钥。"
+          }
+        ]
+      },
+      "sourcePath": "spec/contracts/platform-boundary.yaml",
+      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: platform.boundary\n  title: 平台管理员、普通用户与租户数据边界\n  status: verified\n  owners: [control-plane, runtime-security]\n  tags: [admin, user, tenant, model-catalog, runtime-profile]\nintent:\n  summary: 把平台模型与 Runtime 运维从 Managed Agents 用户界面分离，并用 tenantId 隔离用户资源。\n  outcomes:\n    - 管理员管理模型 Endpoint、平台密钥、Runtime Profile、用户、租户和审计。\n    - 普通用户只选择已发布模型与 Base Agent，并管理本 tenant 的业务资源。\n    - Agent、Session、Environment、Vault、Credential、Memory 与 API Key 都执行相同租户过滤。\n  nonGoals:\n    - 让普通用户读取 Provider Base URL、平台 API Key 或其他 tenant 数据。\nknowledge:\n  - docs/notes/base-agent-runtime-and-platform-control.md\n  - docs/notes/volcengine-managed-agents-reverse-engineering.md\nspecRefs: [agent.runtime, credential.binding, session.lifecycle]\ncontract:\n  role: tenant-aware-platform-control\n  runtime: fastify-react-sqlite\n  adapters:\n    - { id: admin-console, label: 平台模型、Runtime、用户与审计管理 }\n    - { id: managed-agents-console, label: tenant 范围内的 Agent、Session 与资源管理 }\n  ports:\n    - { id: admin-api, direction: in, protocol: admin-session-cookie/v1 }\n    - { id: user-api, direction: in, protocol: tenant-session-cookie/v1 }\n    - { id: model-catalog, direction: out, protocol: published-model-catalog/v1 }\n  features:\n    - { id: role-session, label: 登录 Session 固定 admin/user 角色与 tenantId, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: resource-scope, label: 列表、单项、关联与删除统一 tenant 过滤, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: admin-models, label: 管理员发布 Model Endpoint，用户只看模型目录, status: verified, evidence: apps/web/src/pages/Settings.tsx }\n    - { id: runtime-profiles, label: 管理员发布 Base Agent Runtime Profile, status: verified, evidence: apps/api/src/app.ts }\n  limitations:\n    - 当前管理员可跨租户运维；尚未实现细粒度组织角色、项目空间、邀请和 SSO。\n    - SQLite 适合当前单节点 Beta；横向扩展前需迁移到支持行级安全策略的数据库。\nimplementation:\n  code:\n    - apps/api/src/auth.ts\n    - apps/api/src/db.ts\n    - apps/api/src/app.ts\n    - apps/web/src/components/Auth.tsx\n    - apps/web/src/pages/Settings.tsx\n    - apps/web/src/pages/Agents.tsx\n  notes:\n    - 平台 Model Endpoint 的密钥与租户 Vault 分开保存；Agent Version 只持有 endpointId + modelId。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n  assertions:\n    - { id: cross-tenant-hidden, assertion: 普通用户对其他 tenant 资源的列表、单项读取和删除都得不到资源存在性。 }\n    - { id: admin-only-secrets, assertion: 普通用户 API 不返回平台模型 Base URL 或密钥。 }\n"
+    },
+    {
+      "dsl": "snowmountain.spec/v1",
       "kind": "capability-policy",
       "metadata": {
         "id": "sandbox.boundary",
@@ -653,7 +831,8 @@
         "summary": "任何单一执行组件都不能同时拥有任意代码执行权和生产 Credential。",
         "outcomes": [
           "Tool 代码只能在 Session Workspace 和明确资源上限内运行。",
-          "持有 Docker Socket 的 Worker 不能读取 Vault 或模型 Credential。"
+          "持有 Docker Socket 的 Worker 不能读取 Vault 或模型 Credential。",
+          "命令容器默认允许普通出网；高风险 Session 可显式选择 networkMode=deny。"
         ],
         "nonGoals": [
           "声称 OCI Container 已提供与 microVM 等价的敌对多租户隔离。"
@@ -695,8 +874,8 @@
             "label": "单个 Session Workspace"
           },
           {
-            "id": "arbitrary-egress",
-            "label": "不受限制的网络出口"
+            "id": "command-egress",
+            "label": "Docker 命令容器网络出口"
           }
         ],
         "grants": [
@@ -732,8 +911,8 @@
           },
           {
             "subject": "sandbox",
-            "resource": "arbitrary-egress",
-            "access": "none"
+            "resource": "command-egress",
+            "access": "write"
           }
         ],
         "constraints": [
@@ -755,7 +934,8 @@
           "deploy/docker-compose.prod.yml"
         ],
         "notes": [
-          "当前隔离等级为 Docker/runc：禁用网络、只读 rootfs、移除 Linux Capability、启用 no-new-privileges，并限制 PID、CPU、内存和运行时间。",
+          "当前隔离等级为 Docker/runc：命令容器默认 bridge 出网、只读 rootfs、移除 Linux Capability、启用 no-new-privileges，并限制 PID、CPU、内存和运行时间。",
+          "networkMode 只控制 bash/glob/grep 的 Docker 命令容器；web_fetch 在 Worker，MCP 与模型请求在控制面代理。",
           "gVisor 或 microVM Driver 仍可作为可替换的更高隔离执行后端。"
         ]
       },
@@ -773,11 +953,15 @@
           {
             "id": "path-containment",
             "assertion": "Session ID 与 Workspace 路径不得逃逸 Workspace 根目录。"
+          },
+          {
+            "id": "precise-network-scope",
+            "assertion": "UI 与 Spec 必须准确说明 networkMode 的作用范围，不能把命令容器禁网描述成整个 Agent 断网。"
           }
         ]
       },
       "sourcePath": "spec/contracts/sandbox-boundary.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: capability-policy\nmetadata:\n  id: sandbox.boundary\n  title: Sandbox 与 Credential 隔离边界\n  status: verified\n  owners: [runtime-security]\n  tags: [sandbox, docker, containment]\nintent:\n  summary: 任何单一执行组件都不能同时拥有任意代码执行权和生产 Credential。\n  outcomes:\n    - Tool 代码只能在 Session Workspace 和明确资源上限内运行。\n    - 持有 Docker Socket 的 Worker 不能读取 Vault 或模型 Credential。\n  nonGoals:\n    - 声称 OCI Container 已提供与 microVM 等价的敌对多租户隔离。\nknowledge:\n  - docs/notes/anthropic-containment.md\nspecRefs: [session.lifecycle, credential.binding]\ncontract:\n  subjects:\n    - { id: api, label: 持有 Credential 的控制面 }\n    - { id: worker, label: Sandbox Worker }\n    - { id: sandbox, label: 临时 Tool Container }\n  resources:\n    - { id: vault-secrets, label: Vault 与模型 Credential }\n    - { id: docker-socket, label: 宿主机 Docker Socket }\n    - { id: session-workspace, label: 单个 Session Workspace }\n    - { id: arbitrary-egress, label: 不受限制的网络出口 }\n  grants:\n    - { subject: api, resource: vault-secrets, access: read }\n    - { subject: api, resource: docker-socket, access: none }\n    - { subject: worker, resource: vault-secrets, access: none }\n    - { subject: worker, resource: docker-socket, access: admin }\n    - { subject: sandbox, resource: session-workspace, access: write }\n    - { subject: sandbox, resource: vault-secrets, access: none }\n    - { subject: sandbox, resource: arbitrary-egress, access: none }\n  constraints:\n    - id: split-privilege\n      type: mutually-exclusive\n      resources: [vault-secrets, docker-socket]\n      assertion: 任何主体都不能同时获得 Credential 与 Docker Socket 访问权。\nimplementation:\n  code:\n    - apps/api/src/sandbox.ts\n    - apps/worker/src/app.ts\n    - deploy/docker-compose.prod.yml\n  notes:\n    - 当前隔离等级为 Docker/runc：禁用网络、只读 rootfs、移除 Linux Capability、启用 no-new-privileges，并限制 PID、CPU、内存和运行时间。\n    - gVisor 或 microVM Driver 仍可作为可替换的更高隔离执行后端。\nverification:\n  tests:\n    - apps/worker/test/worker.test.ts\n    - apps/api/test/sandbox.test.ts\n    - apps/api/test/policy.test.ts\n  assertions:\n    - { id: worker-auth, assertion: 未认证的 Worker 请求必须被拒绝。 }\n    - { id: path-containment, assertion: Session ID 与 Workspace 路径不得逃逸 Workspace 根目录。 }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: capability-policy\nmetadata:\n  id: sandbox.boundary\n  title: Sandbox 与 Credential 隔离边界\n  status: verified\n  owners: [runtime-security]\n  tags: [sandbox, docker, containment]\nintent:\n  summary: 任何单一执行组件都不能同时拥有任意代码执行权和生产 Credential。\n  outcomes:\n    - Tool 代码只能在 Session Workspace 和明确资源上限内运行。\n    - 持有 Docker Socket 的 Worker 不能读取 Vault 或模型 Credential。\n    - 命令容器默认允许普通出网；高风险 Session 可显式选择 networkMode=deny。\n  nonGoals:\n    - 声称 OCI Container 已提供与 microVM 等价的敌对多租户隔离。\nknowledge:\n  - docs/notes/anthropic-containment.md\nspecRefs: [session.lifecycle, credential.binding]\ncontract:\n  subjects:\n    - { id: api, label: 持有 Credential 的控制面 }\n    - { id: worker, label: Sandbox Worker }\n    - { id: sandbox, label: 临时 Tool Container }\n  resources:\n    - { id: vault-secrets, label: Vault 与模型 Credential }\n    - { id: docker-socket, label: 宿主机 Docker Socket }\n    - { id: session-workspace, label: 单个 Session Workspace }\n    - { id: command-egress, label: Docker 命令容器网络出口 }\n  grants:\n    - { subject: api, resource: vault-secrets, access: read }\n    - { subject: api, resource: docker-socket, access: none }\n    - { subject: worker, resource: vault-secrets, access: none }\n    - { subject: worker, resource: docker-socket, access: admin }\n    - { subject: sandbox, resource: session-workspace, access: write }\n    - { subject: sandbox, resource: vault-secrets, access: none }\n    - { subject: sandbox, resource: command-egress, access: write }\n  constraints:\n    - id: split-privilege\n      type: mutually-exclusive\n      resources: [vault-secrets, docker-socket]\n      assertion: 任何主体都不能同时获得 Credential 与 Docker Socket 访问权。\nimplementation:\n  code:\n    - apps/api/src/sandbox.ts\n    - apps/worker/src/app.ts\n    - deploy/docker-compose.prod.yml\n  notes:\n    - 当前隔离等级为 Docker/runc：命令容器默认 bridge 出网、只读 rootfs、移除 Linux Capability、启用 no-new-privileges，并限制 PID、CPU、内存和运行时间。\n    - networkMode 只控制 bash/glob/grep 的 Docker 命令容器；web_fetch 在 Worker，MCP 与模型请求在控制面代理。\n    - gVisor 或 microVM Driver 仍可作为可替换的更高隔离执行后端。\nverification:\n  tests:\n    - apps/worker/test/worker.test.ts\n    - apps/api/test/sandbox.test.ts\n    - apps/api/test/policy.test.ts\n  assertions:\n    - { id: worker-auth, assertion: 未认证的 Worker 请求必须被拒绝。 }\n    - { id: path-containment, assertion: Session ID 与 Workspace 路径不得逃逸 Workspace 根目录。 }\n    - { id: precise-network-scope, assertion: UI 与 Spec 必须准确说明 networkMode 的作用范围，不能把命令容器禁网描述成整个 Agent 断网。 }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -1088,6 +1272,13 @@
   ],
   "features": [
     {
+      "id": "runtime-profile",
+      "label": "Base Agent Runtime Profile 版本化与 Agent 固定引用",
+      "status": "verified",
+      "evidence": "apps/api/test/api.test.ts",
+      "specId": "agent.runtime"
+    },
+    {
       "id": "deterministic-mode",
       "label": "确定性无 LLM 验收模式",
       "status": "verified",
@@ -1112,6 +1303,20 @@
       "label": "Runtime 上下文压缩",
       "status": "planned",
       "specId": "agent.runtime"
+    },
+    {
+      "id": "tenancy",
+      "label": "管理员/普通用户角色与 tenantId 数据隔离",
+      "status": "verified",
+      "evidence": "apps/api/test/api.test.ts",
+      "specId": "control-plane.capabilities"
+    },
+    {
+      "id": "model-catalog",
+      "label": "管理员模型 Endpoint 与普通用户模型选择器",
+      "status": "verified",
+      "evidence": "apps/api/test/api.test.ts",
+      "specId": "control-plane.capabilities"
     },
     {
       "id": "agents",
@@ -1175,6 +1380,34 @@
       "status": "implemented",
       "evidence": "apps/api/src/app.ts",
       "specId": "control-plane.capabilities"
+    },
+    {
+      "id": "role-session",
+      "label": "登录 Session 固定 admin/user 角色与 tenantId",
+      "status": "verified",
+      "evidence": "apps/api/test/api.test.ts",
+      "specId": "platform.boundary"
+    },
+    {
+      "id": "resource-scope",
+      "label": "列表、单项、关联与删除统一 tenant 过滤",
+      "status": "verified",
+      "evidence": "apps/api/test/api.test.ts",
+      "specId": "platform.boundary"
+    },
+    {
+      "id": "admin-models",
+      "label": "管理员发布 Model Endpoint，用户只看模型目录",
+      "status": "verified",
+      "evidence": "apps/web/src/pages/Settings.tsx",
+      "specId": "platform.boundary"
+    },
+    {
+      "id": "runtime-profiles",
+      "label": "管理员发布 Base Agent Runtime Profile",
+      "status": "verified",
+      "evidence": "apps/api/src/app.ts",
+      "specId": "platform.boundary"
     },
     {
       "id": "builtin-registry",

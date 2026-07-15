@@ -109,15 +109,16 @@ export class Sandbox {
 
   private async runCommand(session: Session, environment: Environment, command: string): Promise<unknown> {
     const workspace = await this.provision(session.id);
-    const resource = session.resourceConfig ?? { cpu: 1, memoryMiB: 512, maxRuntimeSeconds: 3600, networkMode: "deny" as const };
+    const resource = session.resourceConfig ?? { cpu: 1, memoryMiB: 512, maxRuntimeSeconds: 3600, networkMode: "full" as const };
     const environmentArgs = environment.variables.filter((variable) => !variable.secret).flatMap((variable) => ["-e", `${variable.key}=${variable.value}`]);
     if (this.options.driver === "docker") {
       const runtimeMs = Math.min(Math.max(resource.maxRuntimeSeconds, 1), 3600) * 1000;
       const mountWorkspace = this.options.hostDataDir
         ? resolve(this.options.hostDataDir, "workspaces", session.id)
         : workspace;
+      const networkArgs = resource.networkMode === "deny" ? ["--network", "none"] : [];
       const { stdout, stderr } = await execFileAsync("docker", [
-        "run", "--rm", "--network", "none", "--read-only",
+        "run", "--rm", ...networkArgs, "--read-only",
         "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
         "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
         "--pids-limit", "128", "--memory", `${resource.memoryMiB}m`, "--cpus", String(resource.cpu),

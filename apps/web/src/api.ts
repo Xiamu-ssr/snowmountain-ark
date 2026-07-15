@@ -1,4 +1,4 @@
-import type { AuditEvent, AuthStatus, ManagedResource, MarketCatalog, MonitoringSummary, SessionEvent, SpecBundle } from "@snowmountain/contracts";
+import type { AuditEvent, AuthStatus, ManagedResource, MarketCatalog, ModelCatalogItem, ModelEndpoint, MonitoringSummary, RuntimeProfile, SessionEvent, SpecBundle, UserAccount } from "@snowmountain/contracts";
 
 const configured = import.meta.env.VITE_API_URL as string | undefined;
 const API_BASE = configured?.replace(/\/$/, "") ?? "";
@@ -37,6 +37,30 @@ export const api = {
   },
   audit(): Promise<{ items: AuditEvent[] }> {
     return request("/v1/audit");
+  },
+  modelCatalog(): Promise<{ items: ModelCatalogItem[] }> {
+    return request("/v1/model-catalog");
+  },
+  runtimeProfiles(): Promise<{ items: RuntimeProfile[] }> {
+    return request("/v1/runtime-profiles");
+  },
+  adminUsers(): Promise<{ items: UserAccount[] }> {
+    return request("/v1/admin/users");
+  },
+  createAdminUser(body: { username: string; password: string; tenantId: string; role?: "admin" | "user" }): Promise<UserAccount> {
+    return request("/v1/admin/users", { method: "POST", body: JSON.stringify(body) });
+  },
+  setAdminUserEnabled(id: string, enabled: boolean): Promise<{ updated: boolean }> {
+    return request(`/v1/admin/users/${id}`, { method: "PATCH", body: JSON.stringify({ enabled }) });
+  },
+  adminModelEndpoints(): Promise<{ items: Array<ModelEndpoint & { credentialConfigured?: boolean }> }> {
+    return request("/v1/admin/model-endpoints");
+  },
+  createModelEndpoint(body: unknown): Promise<ModelEndpoint> {
+    return request("/v1/admin/model-endpoints", { method: "POST", body: JSON.stringify(body) });
+  },
+  adminRuntimeProfiles(): Promise<{ items: RuntimeProfile[] }> {
+    return request("/v1/admin/runtime-profiles");
   },
   list<T extends ManagedResource>(path: string): Promise<{ items: T[] }> {
     return request(`/v1/${path}`);

@@ -63,7 +63,7 @@ VM 把 Agent 与主机隔开，也把企业 EDR 挡在外面。OTLP 拉取日志
 
 ## 对雪山方舟的直接决定
 
-1. 默认 Sandbox：临时计算容器 + 独立 Session 工作区卷；网络默认拒绝。
+1. 安全基线建议临时计算容器 + 独立 Session 工作区卷，并支持网络拒绝；当前受控 Beta 按产品选择默认普通出网，精确范围见 Runtime 决策笔记。
 2. 文件挂载必须声明 `read-only / read-write / read-write-no-delete`，并在验证前解析 symlink。
 3. 域名 allowlist 在 UI 中显示为 capability grant，并细分方法、账号、凭证来源和数据方向。
 4. Vault 只在代理层持有真实凭证；Sandbox 得到按 Session、目标和动作缩权的短期令牌。

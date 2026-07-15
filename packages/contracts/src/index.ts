@@ -5,7 +5,9 @@ export type ResourceKind =
   | "credential"
   | "memory-store"
   | "session"
-  | "api-key";
+  | "api-key"
+  | "model-endpoint"
+  | "runtime-profile";
 
 export type ToolName =
   | "bash"
@@ -23,6 +25,8 @@ export interface BaseResource {
   id: string;
   name: string;
   description: string;
+  tenantId?: string | undefined;
+  ownerId?: string | undefined;
   createdAt: string;
   updatedAt: string;
 }
@@ -123,7 +127,52 @@ export interface SessionResourceConfig {
   cpu: number;
   memoryMiB: number;
   maxRuntimeSeconds: number;
-  networkMode: "deny" | "allowlist";
+  networkMode: "deny" | "full";
+}
+
+export interface ModelCatalogItem {
+  id: string;
+  endpointId: string;
+  provider: "mock" | "openai-compatible";
+  name: string;
+  displayName: string;
+  description: string;
+  modalities: Array<"text" | "vision">;
+  contextWindow?: number | undefined;
+  inputPricePerK?: number | undefined;
+  cachedInputPricePerK?: number | undefined;
+  outputPricePerK?: number | undefined;
+  rpm?: number | undefined;
+  tpm?: number | undefined;
+  enabled: boolean;
+}
+
+export interface ModelEndpoint extends BaseResource {
+  kind: "model-endpoint";
+  provider: "mock" | "openai-compatible";
+  baseUrl?: string | undefined;
+  apiKeyCiphertext?: string | undefined;
+  models: ModelCatalogItem[];
+  enabled: boolean;
+}
+
+export interface RuntimeProfile extends BaseResource {
+  kind: "runtime-profile";
+  engine: "snowmountain-harness";
+  version: string;
+  default: boolean;
+  enabled: boolean;
+  capabilities: string[];
+}
+
+export interface UserAccount {
+  id: string;
+  username: string;
+  role: "admin" | "user";
+  tenantId: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PendingApproval {
@@ -294,6 +343,8 @@ export interface AuthStatus {
   enabled: boolean;
   authenticated: boolean;
   user?: string | undefined;
+  role?: "admin" | "user" | undefined;
+  tenantId?: string | undefined;
   csrfToken?: string | undefined;
   expiresAt?: string | undefined;
 }
@@ -348,7 +399,9 @@ export type ManagedResource =
   | Credential
   | MemoryStore
   | Session
-  | ApiKey;
+  | ApiKey
+  | ModelEndpoint
+  | RuntimeProfile;
 
 export const defaultToolPolicies: Record<ToolName, PermissionMode> = {
   bash: "approval",

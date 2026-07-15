@@ -79,26 +79,26 @@ MARKET_INDEX_URL=http://127.0.0.1:4320/api/catalog.json pnpm dev:api
 SANDBOX_DRIVER=docker SANDBOX_IMAGE=alpine:3.20 pnpm dev:api
 ```
 
-Docker 驱动按工具调用启动可替换容器，默认：
+Docker 驱动为命令类工具按调用启动可替换容器，默认：
 
-- `--network none`
+- 普通 Docker bridge 出网；高风险 Session 可设 `networkMode=deny`
 - read-only 根文件系统 + 64 MiB 临时 `/tmp`
 - `cap-drop ALL`
 - `no-new-privileges`
 - CPU、内存与 PID 限制
 - 只将当前 Session 工作区挂载为 `/workspace`
 
-域名 allowlist 只用于代理化的 `web_fetch`，不会给 Sandbox 开放任意网络。
+这个网络开关只覆盖 `bash/glob/grep` 的命令容器。`read/write/edit` 在 Worker 操作工作区，`web_fetch` 由 Worker 发起，MCP 与模型调用分别走控制面代理。
 
 ## 接真实模型
 
-创建 Agent 时选择 `OpenAI-compatible`，填写模型 ID 和 Base URL；API Key 只通过服务端环境变量提供：
+管理员在“平台管理”创建 OpenAI-compatible Endpoint、保存平台 API Key 并发布模型目录；普通用户创建 Agent 时只选择模型与 Base Agent Runtime，不会看到 Provider URL 或密钥。兼容开发模式仍可使用：
 
 ```bash
 MODEL_API_KEY=... pnpm dev:api
 ```
 
-Harness 支持标准 Chat Completions tool call 循环。生产版应把模型 Credential 也迁入 Vault/KMS，并由 provider proxy 按 Agent/Session 解析；不要把 key 写入 Agent Manifest、Environment 或工作区。
+Harness 支持标准 Chat Completions tool call 循环。平台模型密钥与租户 Vault 分离保存；不要把 key 写入 Agent Manifest、Environment 或工作区。
 
 ## API
 

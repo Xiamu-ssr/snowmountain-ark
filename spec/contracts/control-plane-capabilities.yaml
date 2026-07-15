@@ -14,7 +14,7 @@ intent:
     - 因为存在页面或路由就声称已经完整对齐火山方舟。
 knowledge:
   - docs/notes/volcengine-managed-agents-reverse-engineering.md
-specRefs: [session.lifecycle, sandbox.boundary, agent.runtime, memory.lifecycle, market.integration, tool.resolution, credential.binding]
+specRefs: [session.lifecycle, sandbox.boundary, agent.runtime, memory.lifecycle, market.integration, tool.resolution, credential.binding, platform.boundary]
 contract:
   role: human-and-api-control-plane
   runtime: fastify-react-sqlite
@@ -24,6 +24,8 @@ contract:
     - { id: control-api, direction: in, protocol: authenticated-rest }
     - { id: data-api, direction: in, protocol: bearer-rest }
   features:
+    - { id: tenancy, label: 管理员/普通用户角色与 tenantId 数据隔离, status: verified, evidence: apps/api/test/api.test.ts }
+    - { id: model-catalog, label: 管理员模型 Endpoint 与普通用户模型选择器, status: verified, evidence: apps/api/test/api.test.ts }
     - { id: agents, label: Agent 与不可变版本, status: verified, evidence: apps/api/test/api.test.ts }
     - { id: sessions, label: "Session、持久队列、审批与事件回放", status: verified, evidence: apps/api/test/api.test.ts }
     - { id: environments, label: Environment 依赖与普通变量, status: implemented, evidence: apps/web/src/pages/Resources.tsx }

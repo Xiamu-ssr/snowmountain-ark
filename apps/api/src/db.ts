@@ -19,7 +19,9 @@ const prefixByKind: Record<ResourceKind, string> = {
   credential: "cred",
   "memory-store": "memstore",
   session: "sesn",
-  "api-key": "ak"
+  "api-key": "ak",
+  "model-endpoint": "mdl-endpoint",
+  "runtime-profile": "runtime"
 };
 
 interface ResourceRow {
@@ -62,10 +64,24 @@ function interactionJob(row: InteractionJobRow): InteractionJob {
 export interface AuthSessionRow {
   token_hash: string;
   username: string;
+  role: "admin" | "user";
+  tenant_id: string;
   csrf_hash: string;
   expires_at: string;
   created_at: string;
   last_seen_at: string;
+}
+
+export interface UserRow {
+  id: string;
+  username: string;
+  password_salt: string;
+  password_hash: string;
+  role: "admin" | "user";
+  tenant_id: string;
+  enabled: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AuditRow {
@@ -96,6 +112,8 @@ export class Store {
         id TEXT PRIMARY KEY,
         kind TEXT NOT NULL,
         name TEXT NOT NULL,
+        tenant_id TEXT NOT NULL DEFAULT 'default',
+        owner_id TEXT NOT NULL DEFAULT 'system',
         data TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
@@ -135,12 +153,26 @@ export class Store {
       CREATE TABLE IF NOT EXISTS auth_sessions (
         token_hash TEXT PRIMARY KEY,
         username TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'admin',
+        tenant_id TEXT NOT NULL DEFAULT 'system',
         csrf_hash TEXT NOT NULL,
         expires_at TEXT NOT NULL,
         created_at TEXT NOT NULL,
         last_seen_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS auth_sessions_expiry ON auth_sessions(expires_at);
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        password_salt TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS users_tenant ON users(tenant_id, username);
       CREATE TABLE IF NOT EXISTS audit_events (
         id TEXT PRIMARY KEY,
         actor TEXT NOT NULL,
@@ -154,40 +186,59 @@ export class Store {
       );
       CREATE INDEX IF NOT EXISTS audit_events_created ON audit_events(created_at DESC);
     `);
+    const resourceColumns = new Set((this.db.prepare("PRAGMA table_info(resources)").all() as Array<{ name: string }>).map((column) => column.name));
+    if (!resourceColumns.has("tenant_id")) this.db.exec("ALTER TABLE resources ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'");
+    if (!resourceColumns.has("owner_id")) this.db.exec("ALTER TABLE resources ADD COLUMN owner_id TEXT NOT NULL DEFAULT 'system'");
+    const sessionColumns = new Set((this.db.prepare("PRAGMA table_info(auth_sessions)").all() as Array<{ name: string }>).map((column) => column.name));
+    if (!sessionColumns.has("role")) this.db.exec("ALTER TABLE auth_sessions ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
+    if (!sessionColumns.has("tenant_id")) this.db.exec("ALTER TABLE auth_sessions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'system'");
+    this.db.exec("CREATE INDEX IF NOT EXISTS resources_tenant_kind_updated ON resources(tenant_id, kind, updated_at DESC)");
   }
 
   close(): void {
     this.db.close();
   }
 
-  count(kind?: ResourceKind): number {
+  count(kind?: ResourceKind, tenantId?: string): number {
+    if (kind && tenantId) {
+      const row = this.db.prepare("SELECT COUNT(*) AS count FROM resources WHERE kind = ? AND tenant_id = ?").get(kind, tenantId) as { count: number };
+      return row.count;
+    }
     if (kind) {
       const row = this.db.prepare("SELECT COUNT(*) AS count FROM resources WHERE kind = ?").get(kind) as { count: number };
+      return row.count;
+    }
+    if (tenantId) {
+      const row = this.db.prepare("SELECT COUNT(*) AS count FROM resources WHERE tenant_id = ?").get(tenantId) as { count: number };
       return row.count;
     }
     const row = this.db.prepare("SELECT COUNT(*) AS count FROM resources").get() as { count: number };
     return row.count;
   }
 
-  list<T extends ManagedResource>(kind: ResourceKind): T[] {
-    const rows = this.db.prepare(
-      "SELECT data FROM resources WHERE kind = ? ORDER BY updated_at DESC"
-    ).all(kind) as unknown as ResourceRow[];
+  list<T extends ManagedResource>(kind: ResourceKind, tenantId?: string): T[] {
+    const rows = tenantId
+      ? this.db.prepare("SELECT data FROM resources WHERE kind = ? AND tenant_id = ? ORDER BY updated_at DESC").all(kind, tenantId) as unknown as ResourceRow[]
+      : this.db.prepare("SELECT data FROM resources WHERE kind = ? ORDER BY updated_at DESC").all(kind) as unknown as ResourceRow[];
     return rows.map((row) => JSON.parse(row.data) as T);
   }
 
-  get<T extends ManagedResource>(id: string): T | undefined {
-    const row = this.db.prepare("SELECT data FROM resources WHERE id = ?").get(id) as ResourceRow | undefined;
+  get<T extends ManagedResource>(id: string, tenantId?: string): T | undefined {
+    const row = tenantId
+      ? this.db.prepare("SELECT data FROM resources WHERE id = ? AND tenant_id = ?").get(id, tenantId) as ResourceRow | undefined
+      : this.db.prepare("SELECT data FROM resources WHERE id = ?").get(id) as ResourceRow | undefined;
     return row ? JSON.parse(row.data) as T : undefined;
   }
 
   create<T extends ManagedResource>(kind: ResourceKind, input: Omit<T, "id" | "createdAt" | "updatedAt"> & { id?: string }): T {
     const now = new Date().toISOString();
     const id = input.id ?? createId(prefixByKind[kind]);
-    const data = { ...input, id, createdAt: now, updatedAt: now } as T;
+    const tenantId = input.tenantId ?? (kind === "model-endpoint" || kind === "runtime-profile" ? "system" : "default");
+    const ownerId = input.ownerId ?? "system";
+    const data = { ...input, id, tenantId, ownerId, createdAt: now, updatedAt: now } as T;
     this.db.prepare(
-      "INSERT INTO resources(id, kind, name, data, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?)"
-    ).run(id, kind, data.name, JSON.stringify(data), now, now);
+      "INSERT INTO resources(id, kind, name, tenant_id, owner_id, data, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(id, kind, data.name, tenantId, ownerId, JSON.stringify(data), now, now);
     if (kind === "agent") this.saveAgentVersion(data as unknown as Agent);
     return data;
   }
@@ -207,8 +258,8 @@ export class Store {
     if (current.kind === "agent" && options.versionAgent) {
       (next as unknown as Agent).version = (current as unknown as Agent).version + 1;
     }
-    this.db.prepare("UPDATE resources SET name = ?, data = ?, updated_at = ? WHERE id = ?")
-      .run(next.name, JSON.stringify(next), now, id);
+    this.db.prepare("UPDATE resources SET name = ?, tenant_id = ?, owner_id = ?, data = ?, updated_at = ? WHERE id = ?")
+      .run(next.name, next.tenantId ?? "default", next.ownerId ?? "system", JSON.stringify(next), now, id);
     if (current.kind === "agent" && options.versionAgent) this.saveAgentVersion(next as unknown as Agent);
     return next;
   }
@@ -217,6 +268,7 @@ export class Store {
     const resource = this.get(id);
     if (resource?.kind === "session") {
       this.db.prepare("DELETE FROM session_events WHERE session_id = ?").run(id);
+      this.db.prepare("DELETE FROM interaction_jobs WHERE session_id = ?").run(id);
     }
     if (resource?.kind === "agent") {
       this.db.prepare("DELETE FROM agent_versions WHERE agent_id = ?").run(id);
@@ -366,11 +418,11 @@ export class Store {
     return rows.map((row) => row.id);
   }
 
-  createAuthSession(tokenHash: string, username: string, csrfHash: string, expiresAt: string): AuthSessionRow {
+  createAuthSession(tokenHash: string, username: string, role: "admin" | "user", tenantId: string, csrfHash: string, expiresAt: string): AuthSessionRow {
     const now = new Date().toISOString();
-    this.db.prepare("INSERT INTO auth_sessions(token_hash, username, csrf_hash, expires_at, created_at, last_seen_at) VALUES(?, ?, ?, ?, ?, ?)")
-      .run(tokenHash, username, csrfHash, expiresAt, now, now);
-    return { token_hash: tokenHash, username, csrf_hash: csrfHash, expires_at: expiresAt, created_at: now, last_seen_at: now };
+    this.db.prepare("INSERT INTO auth_sessions(token_hash, username, role, tenant_id, csrf_hash, expires_at, created_at, last_seen_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(tokenHash, username, role, tenantId, csrfHash, expiresAt, now, now);
+    return { token_hash: tokenHash, username, role, tenant_id: tenantId, csrf_hash: csrfHash, expires_at: expiresAt, created_at: now, last_seen_at: now };
   }
 
   getAuthSession(tokenHash: string): AuthSessionRow | undefined {
@@ -390,6 +442,26 @@ export class Store {
 
   pruneAuthSessions(): void {
     this.db.prepare("DELETE FROM auth_sessions WHERE expires_at <= ?").run(new Date().toISOString());
+  }
+
+  createUser(input: Omit<UserRow, "created_at" | "updated_at" | "enabled"> & { enabled?: number }): UserRow {
+    const now = new Date().toISOString();
+    const row: UserRow = { ...input, enabled: input.enabled ?? 1, created_at: now, updated_at: now };
+    this.db.prepare("INSERT INTO users(id, username, password_salt, password_hash, role, tenant_id, enabled, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(row.id, row.username, row.password_salt, row.password_hash, row.role, row.tenant_id, row.enabled, now, now);
+    return row;
+  }
+
+  getUserByUsername(username: string): UserRow | undefined {
+    return this.db.prepare("SELECT * FROM users WHERE username = ?").get(username) as unknown as UserRow | undefined;
+  }
+
+  listUsers(): UserRow[] {
+    return this.db.prepare("SELECT * FROM users ORDER BY created_at ASC").all() as unknown as UserRow[];
+  }
+
+  setUserEnabled(id: string, enabled: boolean): boolean {
+    return Number(this.db.prepare("UPDATE users SET enabled = ?, updated_at = ? WHERE id = ?").run(enabled ? 1 : 0, new Date().toISOString(), id).changes) > 0;
   }
 
   appendAudit(input: Omit<AuditRow, "id" | "created_at">): AuditRow {

@@ -1,0 +1,54 @@
+dsl: snowmountain.spec/v1
+kind: component
+metadata:
+  id: platform.boundary
+  title: 平台管理员、普通用户与租户数据边界
+  status: verified
+  owners: [control-plane, runtime-security]
+  tags: [admin, user, tenant, model-catalog, runtime-profile]
+intent:
+  summary: 把平台模型与 Runtime 运维从 Managed Agents 用户界面分离，并用 tenantId 隔离用户资源。
+  outcomes:
+    - 管理员管理模型 Endpoint、平台密钥、Runtime Profile、用户、租户和审计。
+    - 普通用户只选择已发布模型与 Base Agent，并管理本 tenant 的业务资源。
+    - Agent、Session、Environment、Vault、Credential、Memory 与 API Key 都执行相同租户过滤。
+  nonGoals:
+    - 让普通用户读取 Provider Base URL、平台 API Key 或其他 tenant 数据。
+knowledge:
+  - docs/notes/base-agent-runtime-and-platform-control.md
+  - docs/notes/volcengine-managed-agents-reverse-engineering.md
+specRefs: [agent.runtime, credential.binding, session.lifecycle]
+contract:
+  role: tenant-aware-platform-control
+  runtime: fastify-react-sqlite
+  adapters:
+    - { id: admin-console, label: 平台模型、Runtime、用户与审计管理 }
+    - { id: managed-agents-console, label: tenant 范围内的 Agent、Session 与资源管理 }
+  ports:
+    - { id: admin-api, direction: in, protocol: admin-session-cookie/v1 }
+    - { id: user-api, direction: in, protocol: tenant-session-cookie/v1 }
+    - { id: model-catalog, direction: out, protocol: published-model-catalog/v1 }
+  features:
+    - { id: role-session, label: 登录 Session 固定 admin/user 角色与 tenantId, status: verified, evidence: apps/api/test/api.test.ts }
+    - { id: resource-scope, label: 列表、单项、关联与删除统一 tenant 过滤, status: verified, evidence: apps/api/test/api.test.ts }
+    - { id: admin-models, label: 管理员发布 Model Endpoint，用户只看模型目录, status: verified, evidence: apps/web/src/pages/Settings.tsx }
+    - { id: runtime-profiles, label: 管理员发布 Base Agent Runtime Profile, status: verified, evidence: apps/api/src/app.ts }
+  limitations:
+    - 当前管理员可跨租户运维；尚未实现细粒度组织角色、项目空间、邀请和 SSO。
+    - SQLite 适合当前单节点 Beta；横向扩展前需迁移到支持行级安全策略的数据库。
+implementation:
+  code:
+    - apps/api/src/auth.ts
+    - apps/api/src/db.ts
+    - apps/api/src/app.ts
+    - apps/web/src/components/Auth.tsx
+    - apps/web/src/pages/Settings.tsx
+    - apps/web/src/pages/Agents.tsx
+  notes:
+    - 平台 Model Endpoint 的密钥与租户 Vault 分开保存；Agent Version 只持有 endpointId + modelId。
+verification:
+  tests:
+    - apps/api/test/api.test.ts
+  assertions:
+    - { id: cross-tenant-hidden, assertion: 普通用户对其他 tenant 资源的列表、单项读取和删除都得不到资源存在性。 }
+    - { id: admin-only-secrets, assertion: 普通用户 API 不返回平台模型 Base URL 或密钥。 }
