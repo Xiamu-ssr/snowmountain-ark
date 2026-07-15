@@ -1,8 +1,8 @@
 import {
-  Bot, Boxes, ChevronRight, CircleDollarSign, Copy, Cpu, MoreHorizontal,
-  Plus, RefreshCw, ShieldCheck, Sparkles, Wrench
+  Bot, Boxes, ChevronLeft, ChevronRight, CircleDollarSign, Copy, Cpu, MoreHorizontal,
+  Plus, RefreshCw, Search, ShieldCheck, Sparkles, Wrench
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Agent, Credential, MarketEntry, McpServerBinding, ModelCatalogItem, PermissionMode, RuntimeProfile, Session, ToolName } from "@snowmountain/contracts";
 import { defaultToolPolicies } from "@snowmountain/contracts";
@@ -141,9 +141,9 @@ export function AgentCreatePage() {
       {tab === "tools" && <div className="tool-list">
         {(Object.keys(toolDescriptions) as ToolName[]).map((tool) => <div className="tool-row" key={tool}><span className="tool-icon"><Wrench size={15} /></span><div><strong>{tool}</strong><small>{toolDescriptions[tool]}</small></div><label className="switch"><input type="checkbox" checked={toolPolicies[tool] !== "deny"} onChange={(event) => setToolPolicies((value) => ({ ...value, [tool]: event.target.checked ? "workspace" : "deny" }))} /><span /></label><select value={toolPolicies[tool]} onChange={(event) => setToolPolicies((value) => ({ ...value, [tool]: event.target.value as PermissionMode }))}><option value="full">完全访问</option><option value="workspace">工作区内</option><option value="approval">请求批准</option><option value="deny">禁用</option></select></div>)}
       </div>}
-      {tab === "skills" && (relevantMarket.length ? <div className="market-picker">{relevantMarket.map((item) => <MarketPick key={item.id} item={item} selected={selected.includes(item.id)} onClick={() => toggle(item.id)} />)}</div> : <EmptyState title="Market 暂无 Skill" description="雪山 Market 的 Git catalog 会在这里作为可选能力来源。" />)}
+      {tab === "skills" && <MarketCapabilityPicker items={relevantMarket} selectedIds={selected} onToggle={toggle} emptyTitle="Market 暂无 Skill" emptyDescription="雪山 Market 的 Git catalog 会在这里作为可选能力来源。" />}
       {tab === "agents" && <div className="market-picker"><div className="picker-section"><h3>组织内 Agent</h3>{localAgents.map((candidate) => <button type="button" key={candidate.id} onClick={() => toggleLocalAgent(candidate.id)} className={`market-pick-card ${selectedLocalAgents.includes(candidate.id) ? "selected" : ""}`}><span className="resource-icon violet"><Bot size={16} /></span><div><strong>{candidate.name} · V{candidate.version}</strong><p>{candidate.description}</p><small>最多 20 个；已是 Multi-Agent 的不可作为 subagent</small></div><span className="pick-indicator">{selectedLocalAgents.includes(candidate.id) ? "已添加" : "添加"}</span></button>)}</div>{relevantMarket.map((item) => <MarketPick key={item.id} item={item} selected={selected.includes(item.id)} onClick={() => toggle(item.id)} />)}</div>}
-      {tab === "mcps" && <div className="mcp-editor"><div className="market-picker">{relevantMarket.map((item) => <MarketPick key={item.id} item={item} selected={selected.includes(item.id)} onClick={() => toggle(item.id)} />)}</div><div className="mcp-manual-head"><div><h3>手动输入 MCP</h3><p>配置 Streamable HTTP URL、调用策略和显式 Credential。</p></div><button className="button secondary" onClick={addMcp}><Plus size={14} />添加（{mcpServers.length}/20）</button></div>{mcpServers.map((binding, index) => <div className="mcp-row" key={binding.id}><input value={binding.name} onChange={(event) => updateMcp(index, { name: event.target.value })} placeholder="名称" /><input value={binding.url} onChange={(event) => updateMcp(index, { url: event.target.value })} placeholder="https://…/mcp" /><select value={binding.permission} onChange={(event) => updateMcp(index, { permission: event.target.value as McpServerBinding["permission"] })}><option value="full">完全访问</option><option value="approval">请求批准</option><option value="deny">禁用</option></select><select value={binding.credentialId ?? ""} onChange={(event) => updateMcp(index, { credentialId: event.target.value || undefined })}><option value="">无凭证</option>{credentials.filter((credential) => !credential.usage || ["mcp", "generic"].includes(credential.usage)).map((credential) => <option key={credential.id} value={credential.id}>{credential.name}</option>)}</select><button className="icon-button danger" onClick={() => setMcpServers((current) => current.filter((_, itemIndex) => itemIndex !== index))}><MoreHorizontal size={15} /></button></div>)}</div>}
+      {tab === "mcps" && <div className="mcp-editor"><MarketCapabilityPicker items={relevantMarket} selectedIds={selected} onToggle={toggle} emptyTitle="Market 暂无 MCP" emptyDescription="可继续使用下方的手动 MCP binding。" /><div className="mcp-manual-head"><div><h3>手动输入 MCP</h3><p>配置 Streamable HTTP URL、调用策略和显式 Credential。</p></div><button className="button secondary" onClick={addMcp}><Plus size={14} />添加（{mcpServers.length}/20）</button></div>{mcpServers.map((binding, index) => <div className="mcp-row" key={binding.id}><input value={binding.name} onChange={(event) => updateMcp(index, { name: event.target.value })} placeholder="名称" /><input value={binding.url} onChange={(event) => updateMcp(index, { url: event.target.value })} placeholder="https://…/mcp" /><select value={binding.permission} onChange={(event) => updateMcp(index, { permission: event.target.value as McpServerBinding["permission"] })}><option value="full">完全访问</option><option value="approval">请求批准</option><option value="deny">禁用</option></select><select value={binding.credentialId ?? ""} onChange={(event) => updateMcp(index, { credentialId: event.target.value || undefined })}><option value="">无凭证</option>{credentials.filter((credential) => !credential.usage || ["mcp", "generic"].includes(credential.usage)).map((credential) => <option key={credential.id} value={credential.id}>{credential.name}</option>)}</select><button className="icon-button danger" onClick={() => setMcpServers((current) => current.filter((_, itemIndex) => itemIndex !== index))}><MoreHorizontal size={15} /></button></div>)}</div>}
 
       <StepTitle number="05" title="高级参数" />
       <div className="advanced-row"><label>Base Agent <span>运行时 Harness Profile</span><select value={selectedRuntimeId} onChange={(event) => setSelectedRuntimeId(event.target.value)}>{runtimes.map((runtime) => <option value={runtime.id} key={runtime.id}>{runtime.id}{runtime.default ? " · 默认" : ""}</option>)}</select></label><div><span>费用预估</span><strong>{selectedModel?.provider === "mock" ? "本地运行 ¥0.00" : "按模型 Endpoint 计费"}</strong></div><ShieldCheck size={24} /></div>
@@ -227,8 +227,8 @@ export function AgentEditPage() {
       <div className="capability-tabs">{(["skills", "tools", "agents", "mcps"] as CapabilityTab[]).map((item) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item === "agents" ? "Multi Agents" : item.toUpperCase()}</button>)}</div>
       {tab === "tools" && <div className="tool-list">{(Object.keys(toolDescriptions) as ToolName[]).map((tool) => <div className="tool-row" key={tool}><span className="tool-icon"><Wrench size={15} /></span><div><strong>{tool}</strong><small>{toolDescriptions[tool]}</small></div><label className="switch"><input type="checkbox" checked={toolPolicies[tool] !== "deny"} onChange={(event) => setToolPolicies((value) => ({ ...value, [tool]: event.target.checked ? "workspace" : "deny" }))} /><span /></label><select value={toolPolicies[tool]} onChange={(event) => setToolPolicies((value) => ({ ...value, [tool]: event.target.value as PermissionMode }))}><option value="full">完全访问</option><option value="workspace">工作区内</option><option value="approval">请求批准</option><option value="deny">禁用</option></select></div>)}</div>}
       {tab === "agents" && <div className="market-picker"><div className="picker-section"><h3>组织内 Agent</h3>{localSubagents.map((candidate) => <button type="button" key={candidate.id} onClick={() => toggleAgent(candidate.id)} className={`market-pick-card ${selectedAgents.includes(candidate.id) ? "selected" : ""}`}><span className="resource-icon violet"><Bot size={16} /></span><div><strong>{candidate.name} · V{candidate.version}</strong><p>{candidate.description}</p><small>已是 Multi-Agent 的 Agent 不可作为 subagent · 最多 20 个</small></div><span className="pick-indicator">{selectedAgents.includes(candidate.id) ? "已添加" : "添加"}</span></button>)}</div>{marketItems.map((item) => <MarketPick key={item.id} item={item} selected={selectedMarket.includes(item.id)} onClick={() => toggleMarket(item.id)} />)}</div>}
-      {tab === "skills" && <div className="market-picker">{marketItems.length ? marketItems.map((item) => <MarketPick key={item.id} item={item} selected={selectedMarket.includes(item.id)} onClick={() => toggleMarket(item.id)} />) : <EmptyState title="暂无 Skill" description="从雪山 Market 获取可审计 Skill manifest。" />}</div>}
-      {tab === "mcps" && <div className="mcp-editor"><div className="market-picker">{marketItems.map((item) => <MarketPick key={item.id} item={item} selected={selectedMarket.includes(item.id)} onClick={() => toggleMarket(item.id)} />)}</div><div className="mcp-manual-head"><div><h3>手动输入 MCP</h3><p>名称、Streamable HTTP URL、调用策略与显式 Credential。</p></div><button className="button secondary" onClick={addMcp}><Plus size={14} />添加（{mcpServers.length}/20）</button></div>{mcpServers.map((binding, index) => <div className="mcp-row" key={binding.id}><input aria-label="MCP 名称" value={binding.name} onChange={(event) => updateMcp(index, { name: event.target.value })} placeholder="名称" /><input aria-label="MCP URL" value={binding.url} onChange={(event) => updateMcp(index, { url: event.target.value })} placeholder="https://…/mcp" /><select value={binding.permission} onChange={(event) => updateMcp(index, { permission: event.target.value as McpServerBinding["permission"] })}><option value="full">完全访问</option><option value="approval">请求批准</option><option value="deny">禁用</option></select><select value={binding.credentialId ?? ""} onChange={(event) => updateMcp(index, { credentialId: event.target.value || undefined })}><option value="">无凭证</option>{credentials.filter((credential) => !credential.usage || ["mcp", "generic"].includes(credential.usage)).map((credential) => <option key={credential.id} value={credential.id}>{credential.name}</option>)}</select><button className="icon-button danger" onClick={() => removeMcp(index)}><MoreHorizontal size={15} /></button></div>)}</div>}
+      {tab === "skills" && <MarketCapabilityPicker items={marketItems} selectedIds={selectedMarket} onToggle={toggleMarket} emptyTitle="暂无 Skill" emptyDescription="从雪山 Market 获取可审计 Skill manifest。" />}
+      {tab === "mcps" && <div className="mcp-editor"><MarketCapabilityPicker items={marketItems} selectedIds={selectedMarket} onToggle={toggleMarket} emptyTitle="Market 暂无 MCP" emptyDescription="可继续使用下方的手动 MCP binding。" /><div className="mcp-manual-head"><div><h3>手动输入 MCP</h3><p>名称、Streamable HTTP URL、调用策略与显式 Credential。</p></div><button className="button secondary" onClick={addMcp}><Plus size={14} />添加（{mcpServers.length}/20）</button></div>{mcpServers.map((binding, index) => <div className="mcp-row" key={binding.id}><input aria-label="MCP 名称" value={binding.name} onChange={(event) => updateMcp(index, { name: event.target.value })} placeholder="名称" /><input aria-label="MCP URL" value={binding.url} onChange={(event) => updateMcp(index, { url: event.target.value })} placeholder="https://…/mcp" /><select value={binding.permission} onChange={(event) => updateMcp(index, { permission: event.target.value as McpServerBinding["permission"] })}><option value="full">完全访问</option><option value="approval">请求批准</option><option value="deny">禁用</option></select><select value={binding.credentialId ?? ""} onChange={(event) => updateMcp(index, { credentialId: event.target.value || undefined })}><option value="">无凭证</option>{credentials.filter((credential) => !credential.usage || ["mcp", "generic"].includes(credential.usage)).map((credential) => <option key={credential.id} value={credential.id}>{credential.name}</option>)}</select><button className="icon-button danger" onClick={() => removeMcp(index)}><MoreHorizontal size={15} /></button></div>)}</div>}
       <StepTitle number="05" title="高级参数" /><label>Base Agent <span>可版本化 Harness Profile</span><select value={selectedRuntimeId} onChange={(event) => setSelectedRuntimeId(event.target.value)}>{runtimes.map((runtime) => <option key={runtime.id} value={runtime.id}>{runtime.id}{runtime.default ? " · 默认" : ""}</option>)}</select></label>
       <div className="sticky-actions"><button className="button secondary" onClick={() => navigate(`/agents/${id}`)}>取消</button><button className="button primary" onClick={() => void save()} disabled={saving || !name || !selectedModelId || !selectedRuntimeId}>{saving ? "保存中…" : `保存为 V${(agent?.version ?? 0) + 1}`}</button></div>
     </section>
@@ -246,6 +246,54 @@ function ModelPicker({ open, models, selectedId, onSelect, onClose }: { open: bo
 
 function MarketPick({ item, selected, onClick }: { item: MarketEntry; selected: boolean; onClick(): void }) {
   return <button type="button" onClick={onClick} className={`market-pick-card ${selected ? "selected" : ""}`}><span className="resource-icon aqua">{item.type === "skill" ? <Sparkles size={16} /> : item.type === "agent" ? <Bot size={16} /> : <Boxes size={16} />}</span><div><strong>{item.title}</strong><p>{item.description}</p><small>{item.version} · {item.permissions.join(" · ") || "无额外权限"}</small></div><span className="pick-indicator">{selected ? "已添加" : "添加"}</span></button>;
+}
+
+const marketPageSize = 8;
+
+function MarketCapabilityPicker({
+  items, selectedIds, onToggle, emptyTitle, emptyDescription
+}: {
+  items: MarketEntry[];
+  selectedIds: string[];
+  onToggle(id: string): void;
+  emptyTitle: string;
+  emptyDescription: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [tag, setTag] = useState("all");
+  const [selection, setSelection] = useState<"all" | "selected" | "unselected">("all");
+  const [page, setPage] = useState(1);
+  const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const categories = useMemo(() => [...new Set(items.map((item) => item.category).filter((value): value is string => Boolean(value)))].sort((left, right) => left.localeCompare(right)), [items]);
+  const tags = useMemo(() => [...new Set(items.flatMap((item) => item.tags))].sort((left, right) => left.localeCompare(right)), [items]);
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return items.filter((item) => {
+      const matchesQuery = !normalized || [item.title, item.description, item.id, item.provider, item.registry, ...item.tags].filter(Boolean).join(" ").toLowerCase().includes(normalized);
+      const matchesCategory = category === "all" || item.category === category;
+      const matchesTag = tag === "all" || item.tags.includes(tag);
+      const matchesSelection = selection === "all" || (selection === "selected" ? selected.has(item.id) : !selected.has(item.id));
+      return matchesQuery && matchesCategory && matchesTag && matchesSelection;
+    });
+  }, [category, items, query, selected, selection, tag]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / marketPageSize));
+  const safePage = Math.min(page, pageCount);
+  const pageItems = filtered.slice((safePage - 1) * marketPageSize, safePage * marketPageSize);
+  useEffect(() => { setPage(1); }, [query, category, tag, selection]);
+  useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
+
+  return <div className="market-browser">
+    <div className="market-browser-toolbar">
+      <label className="market-browser-search"><span>搜索</span><div><Search size={14} /><input aria-label="搜索 Market 能力" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名称、描述、ID 或标签" /></div></label>
+      <label><span>分类</span><select value={category} onChange={(event) => setCategory(event.target.value)}><option value="all">全部分类</option>{categories.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+      <label><span>标签</span><select value={tag} onChange={(event) => setTag(event.target.value)}><option value="all">全部标签</option>{tags.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+      <label><span>选择状态</span><select value={selection} onChange={(event) => setSelection(event.target.value as typeof selection)}><option value="all">全部条目</option><option value="selected">仅看已添加</option><option value="unselected">仅看未添加</option></select></label>
+    </div>
+    <div className="market-browser-summary"><span>找到 <strong>{filtered.length}</strong> / {items.length} 条</span><span>已添加 <strong>{items.filter((item) => selected.has(item.id)).length}</strong> 条</span></div>
+    {pageItems.length ? <div className="market-browser-list">{pageItems.map((item) => <MarketPick key={item.id} item={item} selected={selected.has(item.id)} onClick={() => onToggle(item.id)} />)}</div> : <EmptyState title={items.length ? "没有符合条件的能力" : emptyTitle} description={items.length ? "调整搜索词或筛选条件后再试。" : emptyDescription} />}
+    {filtered.length > 0 && <div className="market-pagination"><span>第 {safePage} / {pageCount} 页 · 每页 {marketPageSize} 条</span><div><button type="button" className="icon-button" aria-label="上一页" disabled={safePage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}><ChevronLeft size={15} /></button><button type="button" className="icon-button" aria-label="下一页" disabled={safePage === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}><ChevronRight size={15} /></button></div></div>}
+  </div>;
 }
 
 export function AgentDetailPage() {

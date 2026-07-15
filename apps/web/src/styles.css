@@ -213,6 +213,23 @@ input:disabled { color: #9aa3b3; background: #f4f6f9; }
 .market-pick-card:hover, .market-pick-card.selected { background: #fafaff; border-color: #dfe0ff; border-radius: 8px; }
 .market-pick-card strong { font-size: 11px; } .market-pick-card p { margin: 4px 0; color: var(--muted); font-size: 10px; } .market-pick-card small { color: #8e97a8; font-size: 9px; }
 .pick-indicator { color: var(--primary); font-size: 10px; }
+.market-browser { min-height: 320px; padding: 12px 0 4px; }
+.market-browser-toolbar { display: grid; grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(120px, .72fr)); gap: 9px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: #fafbfe; }
+.market-browser-toolbar label { gap: 5px; }
+.market-browser-toolbar label > span { margin: 0; color: #7d879a; font-size: 9px; font-weight: 600; }
+.market-browser-toolbar select, .market-browser-toolbar input { height: 33px; font-size: 10px; }
+.market-browser-search > div { height: 33px; display: flex; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 7px; background: white; color: var(--faint); }
+.market-browser-search > div:focus-within { border-color: #989af4; box-shadow: 0 0 0 3px rgba(93,95,239,.08); }
+.market-browser-search input { height: auto; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.market-browser-search input:focus { border: 0; box-shadow: none; }
+.market-browser-summary { min-height: 39px; display: flex; align-items: center; gap: 16px; padding: 0 10px; border-bottom: 1px solid #eef1f5; color: var(--muted); font-size: 9.5px; }
+.market-browser-summary strong { color: #39445a; }
+.market-browser-list { min-height: 480px; }
+.market-browser .empty-state { min-height: 480px; }
+.market-pagination { min-height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 7px 9px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9.5px; }
+.market-pagination > div { display: flex; gap: 4px; }
+.market-pagination .icon-button { width: 31px; height: 31px; border-color: var(--line); background: white; }
+.market-pagination .icon-button:disabled { opacity: .35; cursor: not-allowed; }
 
 .detail-hero { display: flex; align-items: center; gap: 4px; margin-bottom: 14px; color: var(--muted); font-size: 11px; }
 .detail-hero > span { color: #39445a; }
@@ -560,6 +577,7 @@ input:disabled { color: #9aa3b3; background: #f4f6f9; }
   .spec-viewer-intro { align-items: flex-start; flex-direction: column; }
   .spec-viewer-workbench { grid-template-columns: 240px minmax(0, 1fr); }
   .spec-coverage-grid { grid-template-columns: 1fr; }
+  .market-browser-toolbar { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 760px) {
@@ -587,6 +605,8 @@ input:disabled { color: #9aa3b3; background: #f4f6f9; }
   .monitor-card { align-items: flex-start; flex-direction: column; }
   .tool-row { grid-template-columns: auto 1fr auto; }
   .tool-row select { grid-column: 2 / -1; }
+  .market-browser-toolbar { grid-template-columns: 1fr; }
+  .market-browser-list, .market-browser .empty-state { min-height: 420px; }
   .spec-viewer-topbar { padding: 0 12px; }
   .spec-viewer-main { padding: 16px 10px; }
   .spec-summary-cards { width: 100%; overflow: auto; }
