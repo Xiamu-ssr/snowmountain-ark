@@ -13,12 +13,12 @@
   "schema": "spec/schema/snowmountain-spec.schema.json",
   "summary": {
     "specs": 9,
-    "features": 24,
+    "features": 25,
     "statuses": {
       "planned": 2,
       "partial": 5,
       "implemented": 5,
-      "verified": 21,
+      "verified": 22,
       "deprecated": 0
     }
   },
@@ -43,7 +43,8 @@
         "summary": "保持 Session、Tool 与证据契约稳定，同时允许替换模型和 Agent Runtime 实现。",
         "outcomes": [
           "确定性测试无需外部 LLM。",
-          "OpenAI-compatible Endpoint 通过同一 Policy 与事件面执行有上限的 Tool 循环。"
+          "OpenAI-compatible Endpoint 通过同一 Policy 与事件面执行有上限的 Tool 循环。",
+          "Agent 保存 Latest 与当前版本；Session 只保存 Agent 引用。"
         ],
         "nonGoals": [
           "把当前自研 Harness 描述成与 Claude Agent SDK 或 OpenCode 功能等价。"
@@ -116,6 +117,12 @@
             "evidence": "apps/api/src/harness.ts"
           },
           {
+            "id": "active-version",
+            "label": "Agent 当前版本切换与 Session 动态解析",
+            "status": "verified",
+            "evidence": "apps/api/test/api.test.ts"
+          },
+          {
             "id": "sdk-adapter",
             "label": "Claude Agent SDK 或 OpenCode Runtime Adapter",
             "status": "planned"
@@ -127,7 +134,7 @@
           }
         ],
         "limitations": [
-          "生产环境当前只发布 deterministic-local 模型目录项；管理员尚未配置真实 LLM Endpoint。",
+          "生产环境已配置 ZenMux OpenAI-compatible Endpoint；仍需补充 Provider 级限流、重试与费用对账。",
           "自研循环尚不具备完整 Agent SDK 已成熟的上下文管理、子 Agent 易用性与兼容能力面。"
         ]
       },
@@ -163,7 +170,7 @@
         ]
       },
       "sourcePath": "spec/contracts/agent-runtime.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: agent.runtime\n  title: Agent 运行时与模型工具循环\n  status: partial\n  owners: [agent-runtime]\n  tags: [harness, model, tools]\nintent:\n  summary: 保持 Session、Tool 与证据契约稳定，同时允许替换模型和 Agent Runtime 实现。\n  outcomes:\n    - 确定性测试无需外部 LLM。\n    - OpenAI-compatible Endpoint 通过同一 Policy 与事件面执行有上限的 Tool 循环。\n  nonGoals:\n    - 把当前自研 Harness 描述成与 Claude Agent SDK 或 OpenCode 功能等价。\nknowledge:\n  - docs/notes/anthropic-managed-agents.md\n  - docs/notes/anthropic-auto-mode.md\n  - docs/notes/base-agent-runtime-and-platform-control.md\nspecRefs: [session.lifecycle, sandbox.boundary, tool.resolution, credential.binding, platform.boundary]\ncontract:\n  role: replaceable-agent-harness\n  runtime: bespoke-simple-harness\n  adapters:\n    - { id: deterministic-local, label: 不调用 LLM 的本地确定性 Harness }\n    - { id: openai-compatible, label: OpenAI-compatible Chat Completions Tool 循环 }\n  ports:\n    - { id: interaction, direction: in, protocol: durable-interaction-job/v1 }\n    - { id: model, direction: out, protocol: openai-chat-completions-compatible }\n    - { id: tools, direction: out, protocol: policy-gated-tool-call/v1 }\n    - { id: evidence, direction: out, protocol: append-only-session-events/v1 }\n  features:\n    - { id: runtime-profile, label: Base Agent Runtime Profile 版本化与 Agent 固定引用, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: deterministic-mode, label: 确定性无 LLM 验收模式, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: openai-loop, label: OpenAI-compatible 模型与 Tool 循环, status: implemented, evidence: apps/api/src/harness.ts }\n    - { id: sdk-adapter, label: Claude Agent SDK 或 OpenCode Runtime Adapter, status: planned }\n    - { id: context-compaction, label: Runtime 上下文压缩, status: planned }\n  limitations:\n    - 生产环境当前只发布 deterministic-local 模型目录项；管理员尚未配置真实 LLM Endpoint。\n    - 自研循环尚不具备完整 Agent SDK 已成熟的上下文管理、子 Agent 易用性与兼容能力面。\nimplementation:\n  code:\n    - apps/api/src/runtime.ts\n    - apps/api/src/harness.ts\n    - apps/api/src/mcp.ts\n    - apps/api/src/policy.ts\n  notes:\n    - Runtime Adapter 绝不能绕过 Policy、Sandbox、Vault 代理或 Session 事件。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/api/test/mcp.test.ts\n  assertions:\n    - { id: stable-evidence, assertion: 确定性路径与外部模型路径必须产生相同的事件契约。 }\n    - { id: replaceable-runtime, assertion: 替换模型 Adapter 不得改变 Session 身份或 Workspace 所有权。 }\n    - { id: base-agent-is-runtime, assertion: Base Agent 选择 Runtime Profile，不得与 LLM 模型或业务子 Agent 混为一谈。 }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: agent.runtime\n  title: Agent 运行时与模型工具循环\n  status: partial\n  owners: [agent-runtime]\n  tags: [harness, model, tools]\nintent:\n  summary: 保持 Session、Tool 与证据契约稳定，同时允许替换模型和 Agent Runtime 实现。\n  outcomes:\n    - 确定性测试无需外部 LLM。\n    - OpenAI-compatible Endpoint 通过同一 Policy 与事件面执行有上限的 Tool 循环。\n    - Agent 保存 Latest 与当前版本；Session 只保存 Agent 引用。\n  nonGoals:\n    - 把当前自研 Harness 描述成与 Claude Agent SDK 或 OpenCode 功能等价。\nknowledge:\n  - docs/notes/anthropic-managed-agents.md\n  - docs/notes/anthropic-auto-mode.md\n  - docs/notes/base-agent-runtime-and-platform-control.md\nspecRefs: [session.lifecycle, sandbox.boundary, tool.resolution, credential.binding, platform.boundary]\ncontract:\n  role: replaceable-agent-harness\n  runtime: bespoke-simple-harness\n  adapters:\n    - { id: deterministic-local, label: 不调用 LLM 的本地确定性 Harness }\n    - { id: openai-compatible, label: OpenAI-compatible Chat Completions Tool 循环 }\n  ports:\n    - { id: interaction, direction: in, protocol: durable-interaction-job/v1 }\n    - { id: model, direction: out, protocol: openai-chat-completions-compatible }\n    - { id: tools, direction: out, protocol: policy-gated-tool-call/v1 }\n    - { id: evidence, direction: out, protocol: append-only-session-events/v1 }\n  features:\n    - { id: runtime-profile, label: Base Agent Runtime Profile 版本化与 Agent 固定引用, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: deterministic-mode, label: 确定性无 LLM 验收模式, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: openai-loop, label: OpenAI-compatible 模型与 Tool 循环, status: implemented, evidence: apps/api/src/harness.ts }\n    - { id: active-version, label: Agent 当前版本切换与 Session 动态解析, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: sdk-adapter, label: Claude Agent SDK 或 OpenCode Runtime Adapter, status: planned }\n    - { id: context-compaction, label: Runtime 上下文压缩, status: planned }\n  limitations:\n    - 生产环境已配置 ZenMux OpenAI-compatible Endpoint；仍需补充 Provider 级限流、重试与费用对账。\n    - 自研循环尚不具备完整 Agent SDK 已成熟的上下文管理、子 Agent 易用性与兼容能力面。\nimplementation:\n  code:\n    - apps/api/src/runtime.ts\n    - apps/api/src/harness.ts\n    - apps/api/src/mcp.ts\n    - apps/api/src/policy.ts\n  notes:\n    - Runtime Adapter 绝不能绕过 Policy、Sandbox、Vault 代理或 Session 事件。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/api/test/mcp.test.ts\n  assertions:\n    - { id: stable-evidence, assertion: 确定性路径与外部模型路径必须产生相同的事件契约。 }\n    - { id: replaceable-runtime, assertion: 替换模型 Adapter 不得改变 Session 身份或 Workspace 所有权。 }\n    - { id: base-agent-is-runtime, assertion: Base Agent 选择 Runtime Profile，不得与 LLM 模型或业务子 Agent 混为一谈。 }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -239,13 +246,13 @@
           },
           {
             "id": "agents",
-            "label": "Agent 与不可变版本",
+            "label": "Agent 不可变版本、Latest 与当前版本切换",
             "status": "verified",
             "evidence": "apps/api/test/api.test.ts"
           },
           {
             "id": "sessions",
-            "label": "Session、持久队列、审批与事件回放",
+            "label": "Session、持久队列、对话投影与事件回放",
             "status": "verified",
             "evidence": "apps/api/test/api.test.ts"
           },
@@ -323,7 +330,7 @@
         ]
       },
       "sourcePath": "spec/contracts/control-plane-capabilities.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: control-plane.capabilities\n  title: Managed Agents 中台能力全景图\n  status: partial\n  owners: [control-plane]\n  tags: [ui, api, parity]\nintent:\n  summary: 用可审查的高密度投影向人类展示已验证、部分实现和规划中的平台能力。\n  outcomes:\n    - 进度来自结构化状态与验证证据，不要求人类阅读大量 Markdown 后自行推测。\n  nonGoals:\n    - 因为存在页面或路由就声称已经完整对齐火山方舟。\nknowledge:\n  - docs/notes/volcengine-managed-agents-reverse-engineering.md\nspecRefs: [session.lifecycle, sandbox.boundary, agent.runtime, memory.lifecycle, market.integration, tool.resolution, credential.binding, platform.boundary]\ncontract:\n  role: human-and-api-control-plane\n  runtime: fastify-react-sqlite\n  adapters: []\n  ports:\n    - { id: human-console, direction: in, protocol: https-react }\n    - { id: control-api, direction: in, protocol: authenticated-rest }\n    - { id: data-api, direction: in, protocol: bearer-rest }\n  features:\n    - { id: tenancy, label: 管理员/普通用户角色与 tenantId 数据隔离, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: model-catalog, label: 管理员模型 Endpoint 与普通用户模型选择器, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: agents, label: Agent 与不可变版本, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: sessions, label: \"Session、持久队列、审批与事件回放\", status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: environments, label: Environment 依赖与普通变量, status: implemented, evidence: apps/web/src/pages/Resources.tsx }\n    - { id: vault, label: Credential Vault、显式绑定与 OAuth 刷新, status: verified, evidence: apps/api/test/mcp.test.ts }\n    - { id: memory, label: 显式长期 Memory Store, status: partial, evidence: spec/contracts/memory-lifecycle.yaml }\n    - { id: market, label: Git-first Market 集成, status: implemented, evidence: spec/contracts/market-integration.yaml }\n    - { id: sandbox, label: 可替换的隔离执行后端, status: verified, evidence: apps/worker/test/worker.test.ts }\n    - { id: runtime, label: 生产级 Agent SDK Runtime, status: partial, evidence: spec/contracts/agent-runtime.yaml }\n    - { id: observability, label: \"审计、事件与 Prometheus 指标\", status: implemented, evidence: apps/api/src/app.ts }\n  limitations:\n    - UI 对齐不代表已经复刻火山方舟未公开的服务端行为。\n    - Runtime SDK 选型、Memory 自动抽取和强于 runc 的隔离仍是明确的开放契约。\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/web/src/App.tsx\n  notes:\n    - 规范查看器是开发者投影，不是 Managed Agents 业务模块。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/worker/test/worker.test.ts\n  assertions:\n    - { id: honest-status, assertion: 部分实现、已实现和已验证能力必须在界面中清楚区分。 }\n    - { id: viewer-separation, assertion: Managed Agents 业务侧栏不得包含 SDD 或项目文档栏目。 }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: control-plane.capabilities\n  title: Managed Agents 中台能力全景图\n  status: partial\n  owners: [control-plane]\n  tags: [ui, api, parity]\nintent:\n  summary: 用可审查的高密度投影向人类展示已验证、部分实现和规划中的平台能力。\n  outcomes:\n    - 进度来自结构化状态与验证证据，不要求人类阅读大量 Markdown 后自行推测。\n  nonGoals:\n    - 因为存在页面或路由就声称已经完整对齐火山方舟。\nknowledge:\n  - docs/notes/volcengine-managed-agents-reverse-engineering.md\nspecRefs: [session.lifecycle, sandbox.boundary, agent.runtime, memory.lifecycle, market.integration, tool.resolution, credential.binding, platform.boundary]\ncontract:\n  role: human-and-api-control-plane\n  runtime: fastify-react-sqlite\n  adapters: []\n  ports:\n    - { id: human-console, direction: in, protocol: https-react }\n    - { id: control-api, direction: in, protocol: authenticated-rest }\n    - { id: data-api, direction: in, protocol: bearer-rest }\n  features:\n    - { id: tenancy, label: 管理员/普通用户角色与 tenantId 数据隔离, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: model-catalog, label: 管理员模型 Endpoint 与普通用户模型选择器, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: agents, label: Agent 不可变版本、Latest 与当前版本切换, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: sessions, label: \"Session、持久队列、对话投影与事件回放\", status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: environments, label: Environment 依赖与普通变量, status: implemented, evidence: apps/web/src/pages/Resources.tsx }\n    - { id: vault, label: Credential Vault、显式绑定与 OAuth 刷新, status: verified, evidence: apps/api/test/mcp.test.ts }\n    - { id: memory, label: 显式长期 Memory Store, status: partial, evidence: spec/contracts/memory-lifecycle.yaml }\n    - { id: market, label: Git-first Market 集成, status: implemented, evidence: spec/contracts/market-integration.yaml }\n    - { id: sandbox, label: 可替换的隔离执行后端, status: verified, evidence: apps/worker/test/worker.test.ts }\n    - { id: runtime, label: 生产级 Agent SDK Runtime, status: partial, evidence: spec/contracts/agent-runtime.yaml }\n    - { id: observability, label: \"审计、事件与 Prometheus 指标\", status: implemented, evidence: apps/api/src/app.ts }\n  limitations:\n    - UI 对齐不代表已经复刻火山方舟未公开的服务端行为。\n    - Runtime SDK 选型、Memory 自动抽取和强于 runc 的隔离仍是明确的开放契约。\nimplementation:\n  code:\n    - apps/api/src/app.ts\n    - apps/web/src/App.tsx\n  notes:\n    - 规范查看器是开发者投影，不是 Managed Agents 业务模块。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/worker/test/worker.test.ts\n  assertions:\n    - { id: honest-status, assertion: 部分实现、已实现和已验证能力必须在界面中清楚区分。 }\n    - { id: viewer-separation, assertion: Managed Agents 业务侧栏不得包含 SDD 或项目文档栏目。 }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -983,7 +990,8 @@
         "summary": "Session 是持久状态与证据，不等于一次模型请求或一个 Sandbox Container 的生命周期。",
         "outcomes": [
           "每个 Session 内 Interaction 串行执行，持久队列跨进程重启恢复。",
-          "被中断的副作用不会在重启后静默重放。"
+          "被中断的副作用不会在重启后静默重放。",
+          "Session 只保存 agentId；每次 Interaction 解析 Agent 当前版本，历史实际版本写入事件。"
         ],
         "nonGoals": [
           "在没有显式重试的情况下重建被中断的模型或 Tool Call。"
@@ -1011,10 +1019,6 @@
           {
             "id": "running",
             "label": "运行中"
-          },
-          {
-            "id": "waiting_approval",
-            "label": "等待审批"
           },
           {
             "id": "failed",
@@ -1053,12 +1057,6 @@
           },
           {
             "from": "running",
-            "event": "approval_required",
-            "to": "waiting_approval",
-            "effect": "persist_pending_approval"
-          },
-          {
-            "from": "running",
             "event": "turn_completed",
             "to": "idle",
             "effect": "append_end_turn"
@@ -1074,24 +1072,6 @@
             "event": "user_stop",
             "to": "stopped",
             "effect": "abort_execution"
-          },
-          {
-            "from": "waiting_approval",
-            "event": "approved",
-            "to": "running",
-            "effect": "resume_same_call"
-          },
-          {
-            "from": "waiting_approval",
-            "event": "rejected",
-            "to": "failed",
-            "effect": "persist_denial"
-          },
-          {
-            "from": "waiting_approval",
-            "event": "control_plane_restart",
-            "to": "failed",
-            "effect": "require_explicit_retry"
           }
         ],
         "invariants": [
@@ -1106,6 +1086,10 @@
           {
             "id": "no-silent-replay",
             "assertion": "重启时仍在运行的 Job 必须转为失败，不得自动重放。"
+          },
+          {
+            "id": "agent-reference-only",
+            "assertion": "Session 不固定 Agent Version；当前版本由 Agent 资源统一选择。"
           }
         ]
       },
@@ -1116,7 +1100,8 @@
           "apps/api/src/harness.ts"
         ],
         "notes": [
-          "当前持久队列与事件存储由 SQLite WAL 实现。"
+          "当前持久队列与事件存储由 SQLite WAL 实现。",
+          "数据模型仍兼容历史 waiting_approval 事件；当前调试模式自动放行 approval policy，不进入该状态。"
         ]
       },
       "verification": {
@@ -1135,7 +1120,7 @@
         ]
       },
       "sourcePath": "spec/contracts/session-lifecycle.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: state-machine\nmetadata:\n  id: session.lifecycle\n  title: Managed Session 持久生命周期\n  status: verified\n  owners: [control-plane]\n  tags: [session, queue, recovery]\nintent:\n  summary: Session 是持久状态与证据，不等于一次模型请求或一个 Sandbox Container 的生命周期。\n  outcomes:\n    - 每个 Session 内 Interaction 串行执行，持久队列跨进程重启恢复。\n    - 被中断的副作用不会在重启后静默重放。\n  nonGoals:\n    - 在没有显式重试的情况下重建被中断的模型或 Tool Call。\nknowledge:\n  - docs/notes/anthropic-managed-agents.md\n  - docs/notes/fable5-sdd-dialogue-reading-notes.md\nspecRefs: [sandbox.boundary, agent.runtime]\ncontract:\n  initial: idle\n  states:\n    - { id: idle, label: 空闲 }\n    - { id: queued, label: 已排队 }\n    - { id: running, label: 运行中 }\n    - { id: waiting_approval, label: 等待审批 }\n    - { id: failed, label: 失败 }\n    - { id: stopped, label: 已停止, terminal: true }\n  transitions:\n    - { from: idle, event: interaction_submitted, to: queued, effect: persist_job_and_status_event }\n    - { from: failed, event: explicit_retry, to: queued, effect: persist_new_job }\n    - { from: queued, event: worker_claimed, to: running, effect: append_running_event }\n    - { from: queued, event: user_stop, to: stopped, effect: cancel_queued_job }\n    - { from: running, event: approval_required, to: waiting_approval, effect: persist_pending_approval }\n    - { from: running, event: turn_completed, to: idle, effect: append_end_turn }\n    - { from: running, event: execution_failed, to: failed, effect: persist_error }\n    - { from: running, event: user_stop, to: stopped, effect: abort_execution }\n    - { from: waiting_approval, event: approved, to: running, effect: resume_same_call }\n    - { from: waiting_approval, event: rejected, to: failed, effect: persist_denial }\n    - { from: waiting_approval, event: control_plane_restart, to: failed, effect: require_explicit_retry }\n  invariants:\n    - { id: one-active-job, assertion: 同一 Session 同时最多执行一个 Interaction。 }\n    - { id: append-only-evidence, assertion: 每次状态转换都必须写入只追加的 Session 事件。 }\n    - { id: no-silent-replay, assertion: 重启时仍在运行的 Job 必须转为失败，不得自动重放。 }\nimplementation:\n  code:\n    - apps/api/src/queue.ts\n    - apps/api/src/db.ts\n    - apps/api/src/harness.ts\n  notes:\n    - 当前持久队列与事件存储由 SQLite WAL 实现。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n  assertions:\n    - { id: queue-restart, assertion: 启动前已持久化的排队 Interaction 会在重启后继续处理。 }\n    - { id: workspace-restart, assertion: API 进程重启后，Session 仍能读取同一 Workspace 文件。 }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: state-machine\nmetadata:\n  id: session.lifecycle\n  title: Managed Session 持久生命周期\n  status: verified\n  owners: [control-plane]\n  tags: [session, queue, recovery]\nintent:\n  summary: Session 是持久状态与证据，不等于一次模型请求或一个 Sandbox Container 的生命周期。\n  outcomes:\n    - 每个 Session 内 Interaction 串行执行，持久队列跨进程重启恢复。\n    - 被中断的副作用不会在重启后静默重放。\n    - Session 只保存 agentId；每次 Interaction 解析 Agent 当前版本，历史实际版本写入事件。\n  nonGoals:\n    - 在没有显式重试的情况下重建被中断的模型或 Tool Call。\nknowledge:\n  - docs/notes/anthropic-managed-agents.md\n  - docs/notes/fable5-sdd-dialogue-reading-notes.md\nspecRefs: [sandbox.boundary, agent.runtime]\ncontract:\n  initial: idle\n  states:\n    - { id: idle, label: 空闲 }\n    - { id: queued, label: 已排队 }\n    - { id: running, label: 运行中 }\n    - { id: failed, label: 失败 }\n    - { id: stopped, label: 已停止, terminal: true }\n  transitions:\n    - { from: idle, event: interaction_submitted, to: queued, effect: persist_job_and_status_event }\n    - { from: failed, event: explicit_retry, to: queued, effect: persist_new_job }\n    - { from: queued, event: worker_claimed, to: running, effect: append_running_event }\n    - { from: queued, event: user_stop, to: stopped, effect: cancel_queued_job }\n    - { from: running, event: turn_completed, to: idle, effect: append_end_turn }\n    - { from: running, event: execution_failed, to: failed, effect: persist_error }\n    - { from: running, event: user_stop, to: stopped, effect: abort_execution }\n  invariants:\n    - { id: one-active-job, assertion: 同一 Session 同时最多执行一个 Interaction。 }\n    - { id: append-only-evidence, assertion: 每次状态转换都必须写入只追加的 Session 事件。 }\n    - { id: no-silent-replay, assertion: 重启时仍在运行的 Job 必须转为失败，不得自动重放。 }\n    - { id: agent-reference-only, assertion: Session 不固定 Agent Version；当前版本由 Agent 资源统一选择。 }\nimplementation:\n  code:\n    - apps/api/src/queue.ts\n    - apps/api/src/db.ts\n    - apps/api/src/harness.ts\n  notes:\n    - 当前持久队列与事件存储由 SQLite WAL 实现。\n    - 数据模型仍兼容历史 waiting_approval 事件；当前调试模式自动放行 approval policy，不进入该状态。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n  assertions:\n    - { id: queue-restart, assertion: 启动前已持久化的排队 Interaction 会在重启后继续处理。 }\n    - { id: workspace-restart, assertion: API 进程重启后，Session 仍能读取同一 Workspace 文件。 }\n"
     },
     {
       "dsl": "snowmountain.spec/v1",
@@ -1159,7 +1144,7 @@
         "outcomes": [
           "内置 Tool 由版本化 Runtime Registry 定义，不由 Session 临时生成。",
           "Agent Version 固化 Tool Policy、MCP binding 与子 Agent binding。",
-          "Session 固定 Agent Version，因此有效能力可重放且不受后续编辑污染。",
+          "Session 只绑定 Agent；有效能力从该 Agent 当前版本解析，切换版本后所有 Session 一致生效。",
           "permission=deny 的内置 Tool 不进入模型可见 tool list。"
         ],
         "nonGoals": [
@@ -1195,7 +1180,7 @@
           {
             "id": "session",
             "direction": "in",
-            "protocol": "pinned-agent-version/v1"
+            "protocol": "agent-reference/v1"
           },
           {
             "id": "policy",
@@ -1247,7 +1232,8 @@
           "apps/api/src/app.ts"
         ],
         "notes": [
-          "有效 Tool 集合是 Session 固定 Agent Version 与 Runtime Registry 的交集，不是 Session 独立配置。"
+          "有效 Tool 集合是 Agent 当前版本与 Runtime Registry 的交集，不是 Session 独立配置。",
+          "approval 权限当前记录为 policy evidence 后自动放行，不进入 waiting_approval。"
         ]
       },
       "verification": {
@@ -1257,8 +1243,8 @@
         ],
         "assertions": [
           {
-            "id": "replayable-list",
-            "assertion": "同一 Session 固定版本的有效内置 Tool 列表不会因 Agent 后续编辑而改变。"
+            "id": "active-version-list",
+            "assertion": "切换 Agent 当前版本后，所有绑定 Session 的有效 Tool 列表同步改变。"
           },
           {
             "id": "denied-hidden",
@@ -1267,7 +1253,7 @@
         ]
       },
       "sourcePath": "spec/contracts/tool-resolution.yaml",
-      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: tool.resolution\n  title: Tool 来源与 Session 有效能力解析\n  status: verified\n  owners: [agent-runtime]\n  tags: [tool, session, agent-version, mcp]\nintent:\n  summary: 让人和 Agent 能明确回答每个 Session 到底能看到哪些 Tool，以及每项能力来自哪里。\n  outcomes:\n    - 内置 Tool 由版本化 Runtime Registry 定义，不由 Session 临时生成。\n    - Agent Version 固化 Tool Policy、MCP binding 与子 Agent binding。\n    - Session 固定 Agent Version，因此有效能力可重放且不受后续编辑污染。\n    - permission=deny 的内置 Tool 不进入模型可见 tool list。\n  nonGoals:\n    - 把 Market 条目被选中等同于代码已经安装。\nknowledge:\n  - docs/notes/runtime-sandbox-memory-decisions.md\nspecRefs: [agent.runtime, session.lifecycle, credential.binding]\ncontract:\n  role: effective-tool-resolver\n  runtime: agent-version-derived\n  adapters:\n    - { id: runtime-builtin, label: Runtime 内置 Tool Registry }\n    - { id: mcp-dynamic, label: Agent MCP binding 运行时 tools/list }\n    - { id: subagent-delegation, label: Agent Version 固定的子 Agent 委派 Tool }\n  ports:\n    - { id: session, direction: in, protocol: pinned-agent-version/v1 }\n    - { id: policy, direction: in, protocol: tool-permission-map/v1 }\n    - { id: effective-tools, direction: out, protocol: effective-tool-list/v1 }\n  features:\n    - { id: builtin-registry, label: 内置 Tool 定义集中管理, status: verified, evidence: apps/api/src/tools.ts }\n    - { id: deny-filter, label: deny Tool 不暴露给模型, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: mcp-discovery, label: MCP Tool 由显式 binding 动态发现, status: verified, evidence: apps/api/test/mcp.test.ts }\n    - { id: session-projection, label: Session 有效 Tool API, status: verified, evidence: apps/api/test/api.test.ts }\n  limitations:\n    - Skill 目前只作为 Agent Version 中的能力引用保存，尚未自动装载到 Prompt 或 Sandbox。\n    - Market MCP 条目只表示发现与选择；必须形成含 URL、Policy、Credential 的 MCP binding 才能运行。\nimplementation:\n  code:\n    - apps/api/src/tools.ts\n    - apps/api/src/harness.ts\n    - apps/api/src/mcp.ts\n    - apps/api/src/app.ts\n  notes:\n    - 有效 Tool 集合是 Session 固定 Agent Version 与 Runtime Registry 的交集，不是 Session 独立配置。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/api/test/mcp.test.ts\n  assertions:\n    - { id: replayable-list, assertion: 同一 Session 固定版本的有效内置 Tool 列表不会因 Agent 后续编辑而改变。 }\n    - { id: denied-hidden, assertion: permission=deny 的 Tool 不进入模型请求。 }\n"
+      "source": "dsl: snowmountain.spec/v1\nkind: component\nmetadata:\n  id: tool.resolution\n  title: Tool 来源与 Session 有效能力解析\n  status: verified\n  owners: [agent-runtime]\n  tags: [tool, session, agent-version, mcp]\nintent:\n  summary: 让人和 Agent 能明确回答每个 Session 到底能看到哪些 Tool，以及每项能力来自哪里。\n  outcomes:\n    - 内置 Tool 由版本化 Runtime Registry 定义，不由 Session 临时生成。\n    - Agent Version 固化 Tool Policy、MCP binding 与子 Agent binding。\n    - Session 只绑定 Agent；有效能力从该 Agent 当前版本解析，切换版本后所有 Session 一致生效。\n    - permission=deny 的内置 Tool 不进入模型可见 tool list。\n  nonGoals:\n    - 把 Market 条目被选中等同于代码已经安装。\nknowledge:\n  - docs/notes/runtime-sandbox-memory-decisions.md\nspecRefs: [agent.runtime, session.lifecycle, credential.binding]\ncontract:\n  role: effective-tool-resolver\n  runtime: agent-version-derived\n  adapters:\n    - { id: runtime-builtin, label: Runtime 内置 Tool Registry }\n    - { id: mcp-dynamic, label: Agent MCP binding 运行时 tools/list }\n    - { id: subagent-delegation, label: Agent Version 固定的子 Agent 委派 Tool }\n  ports:\n    - { id: session, direction: in, protocol: agent-reference/v1 }\n    - { id: policy, direction: in, protocol: tool-permission-map/v1 }\n    - { id: effective-tools, direction: out, protocol: effective-tool-list/v1 }\n  features:\n    - { id: builtin-registry, label: 内置 Tool 定义集中管理, status: verified, evidence: apps/api/src/tools.ts }\n    - { id: deny-filter, label: deny Tool 不暴露给模型, status: verified, evidence: apps/api/test/api.test.ts }\n    - { id: mcp-discovery, label: MCP Tool 由显式 binding 动态发现, status: verified, evidence: apps/api/test/mcp.test.ts }\n    - { id: session-projection, label: Session 有效 Tool API, status: verified, evidence: apps/api/test/api.test.ts }\n  limitations:\n    - Skill 目前只作为 Agent Version 中的能力引用保存，尚未自动装载到 Prompt 或 Sandbox。\n    - Market MCP 条目只表示发现与选择；必须形成含 URL、Policy、Credential 的 MCP binding 才能运行。\nimplementation:\n  code:\n    - apps/api/src/tools.ts\n    - apps/api/src/harness.ts\n    - apps/api/src/mcp.ts\n    - apps/api/src/app.ts\n  notes:\n    - 有效 Tool 集合是 Agent 当前版本与 Runtime Registry 的交集，不是 Session 独立配置。\n    - approval 权限当前记录为 policy evidence 后自动放行，不进入 waiting_approval。\nverification:\n  tests:\n    - apps/api/test/api.test.ts\n    - apps/api/test/mcp.test.ts\n  assertions:\n    - { id: active-version-list, assertion: 切换 Agent 当前版本后，所有绑定 Session 的有效 Tool 列表同步改变。 }\n    - { id: denied-hidden, assertion: permission=deny 的 Tool 不进入模型请求。 }\n"
     }
   ],
   "features": [
@@ -1290,6 +1276,13 @@
       "label": "OpenAI-compatible 模型与 Tool 循环",
       "status": "implemented",
       "evidence": "apps/api/src/harness.ts",
+      "specId": "agent.runtime"
+    },
+    {
+      "id": "active-version",
+      "label": "Agent 当前版本切换与 Session 动态解析",
+      "status": "verified",
+      "evidence": "apps/api/test/api.test.ts",
       "specId": "agent.runtime"
     },
     {
@@ -1320,14 +1313,14 @@
     },
     {
       "id": "agents",
-      "label": "Agent 与不可变版本",
+      "label": "Agent 不可变版本、Latest 与当前版本切换",
       "status": "verified",
       "evidence": "apps/api/test/api.test.ts",
       "specId": "control-plane.capabilities"
     },
     {
       "id": "sessions",
-      "label": "Session、持久队列、审批与事件回放",
+      "label": "Session、持久队列、对话投影与事件回放",
       "status": "verified",
       "evidence": "apps/api/test/api.test.ts",
       "specId": "control-plane.capabilities"

@@ -93,13 +93,13 @@ function sanitize(resource: ManagedResource): ManagedResource {
       ...session,
       cacheReadTokens: session.cacheReadTokens ?? 0,
       cacheWriteTokens: session.cacheWriteTokens ?? 0,
-      agentVersion: session.agentVersion ?? 1,
+      agentVersion: undefined,
       resourceConfig: session.resourceConfig
         ? { ...session.resourceConfig, networkMode: session.resourceConfig.networkMode === "deny" ? "deny" : "full" }
         : defaultResourceConfig
     };
   }
-  if (resource.kind === "agent") resource = { ...resource, mcpServers: resource.mcpServers ?? [] };
+  if (resource.kind === "agent") resource = { ...resource, activeVersion: resource.activeVersion ?? resource.version, mcpServers: resource.mcpServers ?? [] };
   if (resource.kind === "environment") {
     resource = { ...resource, variables: resource.variables.map((variable) => variable.secret ? { ...variable, value: "••••••••" } : variable) };
   }
@@ -140,7 +140,7 @@ function seedStore(store: Store): void {
       id: defaultRuntimeProfileId,
       kind: "runtime-profile",
       name: "Snowmountain Managed Agents Preview",
-      description: "可恢复的长任务 Harness：持久 Session、Tool/MCP 路由、审批、子 Agent 与按需 Sandbox。",
+      description: "可恢复的长任务 Harness：持久 Session、Tool/MCP 路由、策略、子 Agent 与按需 Sandbox。",
       tenantId: "system",
       ownerId: "platform",
       engine: "snowmountain-harness",
@@ -204,6 +204,7 @@ function seedStore(store: Store): void {
     name: "雪山向导",
     description: "A managed agent that can inspect and edit its isolated workspace.",
     version: 1,
+    activeVersion: 1,
     baseAgent: defaultRuntimeProfileId,
     model: { provider: "mock", name: "deterministic-local-harness" },
     systemPrompt: "You are 雪山向导. Work only inside /workspace and report evidence from tools.",
@@ -219,7 +220,6 @@ function seedStore(store: Store): void {
     name: "雪山向导 · Demo Session",
     description: "A durable session with an append-only event log.",
     agentId: agent.id,
-    agentVersion: agent.version,
     environmentId: environment.id,
     memoryStoreIds: [memory.id],
     status: "idle",
@@ -282,6 +282,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   const specBundle = loadSpecBundle(config.specBundlePath);
   if (options.seed ?? true) seedStore(store);
   store.recoverInterruptedSessions();
+  store.reconcileSessionTokenUsage();
   const sandbox = new Sandbox({
     dataDir: options.dataDir ?? config.dataDir,
     driver: config.sandboxDriver,
@@ -581,6 +582,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       name: parsed.data.name,
       description: parsed.data.description,
       version: 1,
+      activeVersion: 1,
       baseAgent,
       model: resolvedModel,
       systemPrompt: parsed.data.systemPrompt ?? "Work inside /workspace and cite tool evidence.",
@@ -631,6 +633,14 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     if (!visible<Agent>(request, request.params.id)) return reply.code(404).send({ error: "not_found" });
     const agent = store.getAgentVersion(request.params.id, Number(request.params.version));
     return agent ?? reply.code(404).send({ error: "version_not_found" });
+  });
+  app.post<{ Params: { id: string } }>("/v1/agents/:id/active-version", async (request, reply) => {
+    const agent = visible<Agent>(request, request.params.id);
+    if (!agent) return reply.code(404).send({ error: "not_found" });
+    const parsed = z.object({ version: z.number().int().positive() }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!store.getAgentVersion(agent.id, parsed.data.version)) return reply.code(404).send({ error: "version_not_found" });
+    return sanitize(store.update<Agent>(agent.id, { activeVersion: parsed.data.version }));
   });
 
   app.post("/v1/environments", async (request, reply) => {
@@ -818,7 +828,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     if (missingMemories.length) return reply.code(400).send({ error: "memory_store_not_found", ids: missingMemories });
     const session = createFor<Session>(request, "session", {
       kind: "session", name: parsed.data.name, description: parsed.data.description,
-      agentId: parsed.data.agentId, agentVersion: agent.version, environmentId: parsed.data.environmentId,
+      agentId: parsed.data.agentId, environmentId: parsed.data.environmentId,
       memoryStoreIds: parsed.data.memoryStoreIds ?? [], status: "idle", inputTokens: 0, outputTokens: 0,
       cacheReadTokens: 0, cacheWriteTokens: 0,
       workspacePath: "/workspace", resourceConfig: parsed.data.resourceConfig ?? defaultResourceConfig
@@ -831,13 +841,15 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   app.get<{ Params: { id: string } }>("/v1/sessions/:id/effective-tools", async (request, reply) => {
     const session = visible<Session>(request, request.params.id);
     if (!session) return reply.code(404).send({ error: "not_found" });
-    const agent = store.getAgentVersion(session.agentId, session.agentVersion) ?? store.get<Agent>(session.agentId);
+    const currentAgent = store.get<Agent>(session.agentId);
+    const activeVersion = currentAgent?.activeVersion ?? currentAgent?.version;
+    const agent = activeVersion ? store.getAgentVersion(session.agentId, activeVersion) ?? currentAgent : currentAgent;
     if (!agent) return reply.code(409).send({ error: "pinned_agent_version_missing" });
     return {
       sessionId: session.id,
       agentId: agent.id,
-      agentVersion: session.agentVersion,
-      resolution: "Session → 固定 Agent Version → 内置工具策略 + MCP 动态发现 + 子 Agent 委派",
+      agentVersion: activeVersion,
+      resolution: "Session → Agent 当前版本 → 内置工具策略 + MCP 动态发现 + 子 Agent 委派",
       builtin: effectiveBuiltinTools(agent).map((tool) => ({
         name: tool.function.name,
         description: tool.function.description,
@@ -907,7 +919,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     if (!visible<Session>(request, request.params.id)) return reply.code(404).send({ error: "not_found" });
     const resolved = harness.resolveApproval(request.params.id, request.params.approvalId, parsed.data.allowed);
-    return resolved ? { resolved: true } : reply.code(409).send({ error: "approval_not_active" });
+    return resolved ? { resolved: true } : { resolved: false, autoApproval: true };
   });
 
   app.post<{ Params: { id: string } }>("/v1/sessions/:id/stop", async (request, reply) => {

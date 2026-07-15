@@ -112,7 +112,7 @@ Session 详情同时是调试台：
 - MCP 添加器有“预置 / 手动输入”两个投影。手动输入字段是名称、URL、调用策略和操作，最多 20 个；调用策略仍是“完全访问 / 请求批准”。
 - Credential 的 MCP Server 既可从预置服务选择，也可填写自定义名称和 URL。OAuth 表单分为可选 Access Token 与可选 Client ID / Client secret，随后进入 MCP 授权流程。
 - API 接入是两步向导：获取/创建 API Key，再复制当前 Session 的示例代码。API 操作的仍是与控制台相同的 Session 和事件数据面。
-- Agent 的 Sessions 管理表明确显示 Session 所用 Agent 版本；这要求 Session 创建时固定版本，Agent 后续编辑不能污染既有 Session。
+- 2026-07-15 用户实测纠正了此前推断：Agent 顶部存在“当前版本”选择器，版本历史同时区分 `Latest` 与 `当前`；Session 只绑定 Agent。运行版本由 Agent 的当前版本统一决定，而不是由每个 Session 单独固定。Session 事件仍应记录每轮实际解析到的版本，供回放与审计。
 
 ## 真实探针
 

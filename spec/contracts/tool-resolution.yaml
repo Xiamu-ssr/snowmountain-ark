@@ -11,7 +11,7 @@ intent:
   outcomes:
     - 内置 Tool 由版本化 Runtime Registry 定义，不由 Session 临时生成。
     - Agent Version 固化 Tool Policy、MCP binding 与子 Agent binding。
-    - Session 固定 Agent Version，因此有效能力可重放且不受后续编辑污染。
+    - Session 只绑定 Agent；有效能力从该 Agent 当前版本解析，切换版本后所有 Session 一致生效。
     - permission=deny 的内置 Tool 不进入模型可见 tool list。
   nonGoals:
     - 把 Market 条目被选中等同于代码已经安装。
@@ -26,7 +26,7 @@ contract:
     - { id: mcp-dynamic, label: Agent MCP binding 运行时 tools/list }
     - { id: subagent-delegation, label: Agent Version 固定的子 Agent 委派 Tool }
   ports:
-    - { id: session, direction: in, protocol: pinned-agent-version/v1 }
+    - { id: session, direction: in, protocol: agent-reference/v1 }
     - { id: policy, direction: in, protocol: tool-permission-map/v1 }
     - { id: effective-tools, direction: out, protocol: effective-tool-list/v1 }
   features:
@@ -44,11 +44,12 @@ implementation:
     - apps/api/src/mcp.ts
     - apps/api/src/app.ts
   notes:
-    - 有效 Tool 集合是 Session 固定 Agent Version 与 Runtime Registry 的交集，不是 Session 独立配置。
+    - 有效 Tool 集合是 Agent 当前版本与 Runtime Registry 的交集，不是 Session 独立配置。
+    - approval 权限当前记录为 policy evidence 后自动放行，不进入 waiting_approval。
 verification:
   tests:
     - apps/api/test/api.test.ts
     - apps/api/test/mcp.test.ts
   assertions:
-    - { id: replayable-list, assertion: 同一 Session 固定版本的有效内置 Tool 列表不会因 Agent 后续编辑而改变。 }
+    - { id: active-version-list, assertion: 切换 Agent 当前版本后，所有绑定 Session 的有效 Tool 列表同步改变。 }
     - { id: denied-hidden, assertion: permission=deny 的 Tool 不进入模型请求。 }

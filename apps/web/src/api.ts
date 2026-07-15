@@ -71,6 +71,12 @@ export const api = {
   agentVersions(agentId: string): Promise<{ items: ManagedResource[] }> {
     return request(`/v1/agents/${agentId}/versions`);
   },
+  agentVersion(agentId: string, version: number): Promise<ManagedResource> {
+    return request(`/v1/agents/${agentId}/versions/${version}`);
+  },
+  activateAgentVersion(agentId: string, version: number): Promise<ManagedResource> {
+    return request(`/v1/agents/${agentId}/active-version`, { method: "POST", body: JSON.stringify({ version }) });
+  },
   create<T>(path: string, body: unknown): Promise<T> {
     return request(`/v1/${path}`, { method: "POST", body: JSON.stringify(body) });
   },

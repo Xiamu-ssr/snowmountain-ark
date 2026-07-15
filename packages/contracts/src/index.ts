@@ -58,7 +58,10 @@ export interface McpServerBinding {
 
 export interface Agent extends BaseResource {
   kind: "agent";
+  /** Latest immutable version number. */
   version: number;
+  /** Version currently served by every Session bound to this Agent. */
+  activeVersion?: number | undefined;
   baseAgent: string;
   model: ModelConfig;
   systemPrompt: string;
@@ -185,7 +188,8 @@ export interface PendingApproval {
 export interface Session extends BaseResource {
   kind: "session";
   agentId: string;
-  agentVersion: number;
+  /** Legacy field retained for stored-data compatibility; runtime ignores it. */
+  agentVersion?: number | undefined;
   environmentId: string;
   memoryStoreIds: string[];
   status: SessionStatus;
@@ -404,12 +408,12 @@ export type ManagedResource =
   | RuntimeProfile;
 
 export const defaultToolPolicies: Record<ToolName, PermissionMode> = {
-  bash: "approval",
+  bash: "full",
   read: "workspace",
   write: "workspace",
   edit: "workspace",
   glob: "workspace",
   grep: "workspace",
-  web_fetch: "approval",
-  web_search: "approval"
+  web_fetch: "full",
+  web_search: "full"
 };

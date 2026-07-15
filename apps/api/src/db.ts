@@ -256,7 +256,10 @@ export class Store {
       updatedAt: now
     } as T;
     if (current.kind === "agent" && options.versionAgent) {
-      (next as unknown as Agent).version = (current as unknown as Agent).version + 1;
+      const currentAgent = current as unknown as Agent;
+      const nextAgent = next as unknown as Agent;
+      nextAgent.activeVersion = currentAgent.activeVersion ?? currentAgent.version;
+      nextAgent.version = currentAgent.version + 1;
     }
     this.db.prepare("UPDATE resources SET name = ?, tenant_id = ?, owner_id = ?, data = ?, updated_at = ? WHERE id = ?")
       .run(next.name, next.tenantId ?? "default", next.ownerId ?? "system", JSON.stringify(next), now, id);
@@ -354,6 +357,25 @@ export class Store {
       });
     }
     return interrupted.map((session) => session.id);
+  }
+
+  reconcileSessionTokenUsage(): string[] {
+    const reconciled: string[] = [];
+    for (const session of this.list<Session>("session")) {
+      const requests = this.events<Record<string, unknown>>(session.id, 0, 10_000).filter((event) => event.type === "model_request_end");
+      if (!requests.length) continue;
+      const totals = requests.reduce((value, event) => {
+        value.inputTokens += Number(event.payload.inputTokens ?? 0);
+        value.outputTokens += Number(event.payload.outputTokens ?? 0);
+        value.cacheReadTokens += Number(event.payload.cacheReadTokens ?? 0);
+        value.cacheWriteTokens += Number(event.payload.cacheWriteTokens ?? 0);
+        return value;
+      }, { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 });
+      if (session.inputTokens === totals.inputTokens && session.outputTokens === totals.outputTokens && (session.cacheReadTokens ?? 0) === totals.cacheReadTokens && (session.cacheWriteTokens ?? 0) === totals.cacheWriteTokens) continue;
+      this.update<Session>(session.id, totals);
+      reconciled.push(session.id);
+    }
+    return reconciled;
   }
 
   enqueueInteraction(sessionId: string, content: string): InteractionJob {

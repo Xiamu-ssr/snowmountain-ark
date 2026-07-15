@@ -11,6 +11,7 @@ intent:
   outcomes:
     - 每个 Session 内 Interaction 串行执行，持久队列跨进程重启恢复。
     - 被中断的副作用不会在重启后静默重放。
+    - Session 只保存 agentId；每次 Interaction 解析 Agent 当前版本，历史实际版本写入事件。
   nonGoals:
     - 在没有显式重试的情况下重建被中断的模型或 Tool Call。
 knowledge:
@@ -23,7 +24,6 @@ contract:
     - { id: idle, label: 空闲 }
     - { id: queued, label: 已排队 }
     - { id: running, label: 运行中 }
-    - { id: waiting_approval, label: 等待审批 }
     - { id: failed, label: 失败 }
     - { id: stopped, label: 已停止, terminal: true }
   transitions:
@@ -31,17 +31,14 @@ contract:
     - { from: failed, event: explicit_retry, to: queued, effect: persist_new_job }
     - { from: queued, event: worker_claimed, to: running, effect: append_running_event }
     - { from: queued, event: user_stop, to: stopped, effect: cancel_queued_job }
-    - { from: running, event: approval_required, to: waiting_approval, effect: persist_pending_approval }
     - { from: running, event: turn_completed, to: idle, effect: append_end_turn }
     - { from: running, event: execution_failed, to: failed, effect: persist_error }
     - { from: running, event: user_stop, to: stopped, effect: abort_execution }
-    - { from: waiting_approval, event: approved, to: running, effect: resume_same_call }
-    - { from: waiting_approval, event: rejected, to: failed, effect: persist_denial }
-    - { from: waiting_approval, event: control_plane_restart, to: failed, effect: require_explicit_retry }
   invariants:
     - { id: one-active-job, assertion: 同一 Session 同时最多执行一个 Interaction。 }
     - { id: append-only-evidence, assertion: 每次状态转换都必须写入只追加的 Session 事件。 }
     - { id: no-silent-replay, assertion: 重启时仍在运行的 Job 必须转为失败，不得自动重放。 }
+    - { id: agent-reference-only, assertion: Session 不固定 Agent Version；当前版本由 Agent 资源统一选择。 }
 implementation:
   code:
     - apps/api/src/queue.ts
@@ -49,6 +46,7 @@ implementation:
     - apps/api/src/harness.ts
   notes:
     - 当前持久队列与事件存储由 SQLite WAL 实现。
+    - 数据模型仍兼容历史 waiting_approval 事件；当前调试模式自动放行 approval policy，不进入该状态。
 verification:
   tests:
     - apps/api/test/api.test.ts

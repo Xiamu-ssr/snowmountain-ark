@@ -57,46 +57,54 @@ test("rejects deletion of a resource referenced by a session", async () => {
   }
 });
 
-test("pins a Session to the Agent version selected at creation", async () => {
+test("binds a Session to an Agent and follows its active version", async () => {
   const root = await mkdtemp(join(tmpdir(), "snowmountain-api-"));
   const app = await buildApp({ databasePath: join(root, "test.db"), dataDir: root, seed: true });
   try {
     const before = (await app.inject({ method: "GET", url: "/v1/agents/agent-snowmountain-guide" })).json<Agent>();
     assert.equal(before.version, 1);
+    assert.equal(before.activeVersion, 1);
     const updated = (await app.inject({ method: "PATCH", url: "/v1/agents/agent-snowmountain-guide", payload: { description: "new version" } })).json<Agent>();
     assert.equal(updated.version, 2);
+    assert.equal(updated.activeVersion, 1);
     const originalSession = (await app.inject({ method: "GET", url: "/v1/sessions/sesn-snowmountain-demo" })).json<Session>();
-    assert.equal(originalSession.agentVersion, 1);
+    assert.equal(originalSession.agentVersion, undefined);
     const interaction = await app.inject({ method: "POST", url: "/v1/sessions/sesn-snowmountain-demo/interactions", payload: { content: "说明当前版本", wait: true } });
     assert.equal(interaction.statusCode, 200, interaction.body);
-    const events = (await app.inject({ method: "GET", url: "/v1/sessions/sesn-snowmountain-demo/events" })).json<{ items: SessionEvent[] }>().items;
+    let events = (await app.inject({ method: "GET", url: "/v1/sessions/sesn-snowmountain-demo/events" })).json<{ items: SessionEvent[] }>().items;
     assert.match(JSON.stringify(events.filter((event) => event.type === "assistant").at(-1)?.payload), /V1/);
+    const activated = await app.inject({ method: "POST", url: "/v1/agents/agent-snowmountain-guide/active-version", payload: { version: 2 } });
+    assert.equal(activated.statusCode, 200, activated.body);
+    assert.equal(activated.json<Agent>().activeVersion, 2);
+    const nextInteraction = await app.inject({ method: "POST", url: "/v1/sessions/sesn-snowmountain-demo/interactions", payload: { content: "再次说明当前版本", wait: true } });
+    assert.equal(nextInteraction.statusCode, 200, nextInteraction.body);
+    events = (await app.inject({ method: "GET", url: "/v1/sessions/sesn-snowmountain-demo/events" })).json<{ items: SessionEvent[] }>().items;
+    assert.match(JSON.stringify(events.filter((event) => event.type === "assistant").at(-1)?.payload), /V2/);
   } finally {
     await app.close();
     await rm(root, { recursive: true, force: true });
   }
 });
 
-test("pauses an approval tool call and resumes after a human decision", async () => {
+test("auto-allows approval-mode tools during the debugging phase", async () => {
   const root = await mkdtemp(join(tmpdir(), "snowmountain-api-"));
   const app = await buildApp({ databasePath: join(root, "test.db"), dataDir: root, seed: true });
   try {
-    await app.inject({ method: "PATCH", url: "/v1/agents/agent-snowmountain-guide", payload: { toolPolicies: { bash: "approval", read: "workspace", write: "workspace", edit: "workspace", glob: "workspace", grep: "workspace", web_fetch: "approval", web_search: "approval" } } });
+    const approvalVersion = (await app.inject({ method: "PATCH", url: "/v1/agents/agent-snowmountain-guide", payload: { toolPolicies: { bash: "approval", read: "workspace", write: "workspace", edit: "workspace", glob: "workspace", grep: "workspace", web_fetch: "approval", web_search: "approval" } } })).json<Agent>();
+    await app.inject({ method: "POST", url: "/v1/agents/agent-snowmountain-guide/active-version", payload: { version: approvalVersion.version } });
     const created = (await app.inject({ method: "POST", url: "/v1/sessions", payload: { name: "approval", agentId: "agent-snowmountain-guide", environmentId: "env-default" } })).json<Session>();
-    const accepted = await app.inject({ method: "POST", url: `/v1/sessions/${created.id}/interactions`, payload: { content: "运行 probe" } });
-    assert.equal(accepted.statusCode, 202, accepted.body);
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    const waiting = (await app.inject({ method: "GET", url: `/v1/sessions/${created.id}` })).json<Session>();
-    assert.equal(waiting.status, "waiting_approval");
-    assert.ok(waiting.pendingApproval);
-    const resolution = await app.inject({ method: "POST", url: `/v1/sessions/${created.id}/approvals/${waiting.pendingApproval?.id}`, payload: { allowed: true } });
-    assert.equal(resolution.statusCode, 200, resolution.body);
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    const accepted = await app.inject({ method: "POST", url: `/v1/sessions/${created.id}/interactions`, payload: { content: "运行 probe", wait: true } });
+    assert.equal(accepted.statusCode, 200, accepted.body);
     const finished = (await app.inject({ method: "GET", url: `/v1/sessions/${created.id}` })).json<Session>();
     assert.equal(finished.status, "idle");
+    assert.equal(finished.pendingApproval, undefined);
     const events = (await app.inject({ method: "GET", url: `/v1/sessions/${created.id}/events` })).json<{ items: SessionEvent[] }>().items;
-    assert.ok(events.some((event) => event.type === "approval_request"));
-    assert.ok(events.some((event) => event.type === "approval_result"));
+    assert.ok(!events.some((event) => event.type === "approval_request"));
+    assert.ok(events.some((event) => event.type === "policy" && (event.payload as { rule?: string }).rule === "approval.auto"));
+    assert.ok(events.some((event) => event.type === "tool_result"));
+    const staleResolution = await app.inject({ method: "POST", url: `/v1/sessions/${created.id}/approvals/appr-stale`, payload: { allowed: true } });
+    assert.equal(staleResolution.statusCode, 200, staleResolution.body);
+    assert.equal(staleResolution.json().autoApproval, true);
   } finally {
     await app.close();
     await rm(root, { recursive: true, force: true });
@@ -309,7 +317,7 @@ test("serves the validated YAML Spec bundle with runtime facts", async () => {
   }
 });
 
-test("resolves Session tools from the pinned Agent version and hides denied tools", async () => {
+test("resolves Session tools from the Agent active version and hides denied tools", async () => {
   const root = await mkdtemp(join(tmpdir(), "snowmountain-tools-"));
   const app = await buildApp({ databasePath: join(root, "test.db"), dataDir: root, seed: true });
   try {
@@ -327,14 +335,20 @@ test("resolves Session tools from the pinned Agent version and hides denied tool
     })).json<Agent>();
     assert.equal(updated.version, 2);
 
-    const stillPinned = (await app.inject({ method: "GET", url: "/v1/sessions/sesn-snowmountain-demo/effective-tools" })).json<{ agentVersion: number; builtin: Array<{ name: string }> }>();
-    assert.equal(stillPinned.agentVersion, 1);
-    assert.ok(stillPinned.builtin.some((tool) => tool.name === "web_search"));
+    const beforeActivation = (await app.inject({ method: "GET", url: "/v1/sessions/sesn-snowmountain-demo/effective-tools" })).json<{ agentVersion: number; builtin: Array<{ name: string }> }>();
+    assert.equal(beforeActivation.agentVersion, 1);
+    assert.ok(beforeActivation.builtin.some((tool) => tool.name === "web_search"));
 
     const nextSession = (await app.inject({ method: "POST", url: "/v1/sessions", payload: { name: "v2-tools", agentId: updated.id, environmentId: "env-default" } })).json<Session>();
-    const nextTools = (await app.inject({ method: "GET", url: `/v1/sessions/${nextSession.id}/effective-tools` })).json<{ agentVersion: number; builtin: Array<{ name: string }> }>();
-    assert.equal(nextTools.agentVersion, 2);
-    assert.ok(!nextTools.builtin.some((tool) => tool.name === "web_search"));
+    const beforeActivationNext = (await app.inject({ method: "GET", url: `/v1/sessions/${nextSession.id}/effective-tools` })).json<{ agentVersion: number; builtin: Array<{ name: string }> }>();
+    assert.equal(beforeActivationNext.agentVersion, 1);
+    const activation = await app.inject({ method: "POST", url: `/v1/agents/${updated.id}/active-version`, payload: { version: 2 } });
+    assert.equal(activation.statusCode, 200, activation.body);
+    for (const sessionId of ["sesn-snowmountain-demo", nextSession.id]) {
+      const activeTools = (await app.inject({ method: "GET", url: `/v1/sessions/${sessionId}/effective-tools` })).json<{ agentVersion: number; builtin: Array<{ name: string }> }>();
+      assert.equal(activeTools.agentVersion, 2);
+      assert.ok(!activeTools.builtin.some((tool) => tool.name === "web_search"));
+    }
   } finally {
     await app.close();
     await rm(root, { recursive: true, force: true });

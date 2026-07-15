@@ -11,6 +11,7 @@ intent:
   outcomes:
     - 确定性测试无需外部 LLM。
     - OpenAI-compatible Endpoint 通过同一 Policy 与事件面执行有上限的 Tool 循环。
+    - Agent 保存 Latest 与当前版本；Session 只保存 Agent 引用。
   nonGoals:
     - 把当前自研 Harness 描述成与 Claude Agent SDK 或 OpenCode 功能等价。
 knowledge:
@@ -33,10 +34,11 @@ contract:
     - { id: runtime-profile, label: Base Agent Runtime Profile 版本化与 Agent 固定引用, status: verified, evidence: apps/api/test/api.test.ts }
     - { id: deterministic-mode, label: 确定性无 LLM 验收模式, status: verified, evidence: apps/api/test/api.test.ts }
     - { id: openai-loop, label: OpenAI-compatible 模型与 Tool 循环, status: implemented, evidence: apps/api/src/harness.ts }
+    - { id: active-version, label: Agent 当前版本切换与 Session 动态解析, status: verified, evidence: apps/api/test/api.test.ts }
     - { id: sdk-adapter, label: Claude Agent SDK 或 OpenCode Runtime Adapter, status: planned }
     - { id: context-compaction, label: Runtime 上下文压缩, status: planned }
   limitations:
-    - 生产环境当前只发布 deterministic-local 模型目录项；管理员尚未配置真实 LLM Endpoint。
+    - 生产环境已配置 ZenMux OpenAI-compatible Endpoint；仍需补充 Provider 级限流、重试与费用对账。
     - 自研循环尚不具备完整 Agent SDK 已成熟的上下文管理、子 Agent 易用性与兼容能力面。
 implementation:
   code:

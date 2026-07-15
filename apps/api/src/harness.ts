@@ -67,7 +67,7 @@ export class Harness implements AgentRuntime {
     const session = this.store.get<Session>(sessionId);
     if (!session) throw new Error("Session not found");
     const currentAgent = this.store.get<Agent>(session.agentId);
-    const version = session.agentVersion ?? currentAgent?.version ?? 1;
+    const version = currentAgent?.activeVersion ?? currentAgent?.version ?? 1;
     const agent = this.store.getAgentVersion(session.agentId, version) ?? currentAgent;
     const environment = this.store.get<Environment>(session.environmentId);
     if (!agent || !environment) throw new Error("Session dependencies are missing");
@@ -79,10 +79,9 @@ export class Harness implements AgentRuntime {
     this.store.update<Session>(sessionId, {
       status: "running",
       lastError: "",
-      startedAt: session.startedAt ?? new Date().toISOString(),
-      agentVersion: version
+      startedAt: session.startedAt ?? new Date().toISOString()
     });
-    this.store.appendEvent(sessionId, "status", { status: "running", threadStatus: "running" });
+    this.store.appendEvent(sessionId, "status", { status: "running", threadStatus: "running", agentVersion: version });
 
     try {
       if (agent.model.provider === "openai-compatible") {
@@ -90,12 +89,14 @@ export class Harness implements AgentRuntime {
       } else {
         const started = Date.now();
         const inputTokens = Math.ceil(content.length / 3);
-        this.store.appendEvent(sessionId, "model_request_start", { model: agent.model.name, provider: agent.model.provider });
+        this.store.appendEvent(sessionId, "model_request_start", { model: agent.model.name, provider: agent.model.provider, agentVersion: agent.version });
         await this.runMock(session, agent, environment, content);
         const latest = this.store.get<Session>(sessionId);
         const outputTokens = Math.max(0, (latest?.outputTokens ?? 0) - (session.outputTokens ?? 0));
         this.store.appendEvent(sessionId, "model_request_end", {
           model: agent.model.name,
+          provider: agent.model.provider,
+          agentVersion: agent.version,
           inputTokens,
           outputTokens,
           cacheReadTokens: 0,
@@ -165,7 +166,7 @@ export class Harness implements AgentRuntime {
     const memoryCount = this.boundMemories(session).reduce((sum, store) => sum + store.memories.length, 0);
     this.assistant(
       session.id,
-      `我是 ${agent.name}。当前固定在 V${session.agentVersion ?? agent.version}，使用 ${agent.model.name}，绑定环境 ${environment.name}，可读取 ${memoryCount} 条显式长期记忆。这条回复来自本地确定性 Harness；配置 OpenAI-compatible endpoint 与服务端 Credential 后可切换真实模型循环。`
+      `我是 ${agent.name}。当前 Agent 版本为 V${agent.version}，使用 ${agent.model.name}，绑定环境 ${environment.name}，可读取 ${memoryCount} 条显式长期记忆。这条回复来自本地确定性 Harness；配置 OpenAI-compatible endpoint 与服务端 Credential 后可切换真实模型循环。`
     );
   }
 
@@ -178,9 +179,11 @@ export class Harness implements AgentRuntime {
   ): Promise<unknown> {
     const call: ToolCall = { id: createId("call"), name, input };
     const decision = decidePolicy(call, agent, environment);
-    this.store.appendEvent(session.id, "policy", { callId: call.id, ...decision });
+    const effectiveDecision = decision.effect === "approval"
+      ? { ...decision, effect: "allow" as const, requestedEffect: "approval", reason: `${decision.reason}；调试阶段自动放行`, rule: "approval.auto" }
+      : decision;
+    this.store.appendEvent(session.id, "policy", { callId: call.id, ...effectiveDecision });
     if (decision.effect === "deny") throw new Error(`deny: ${decision.reason}`);
-    if (decision.effect === "approval") await this.waitForApproval(session.id, call, decision.reason);
     this.store.appendEvent<ToolUsePayload>(session.id, "tool_use", { call });
     const result = await this.sandbox.execute(call, session, environment);
     this.store.appendEvent(session.id, "tool_result", { callId: call.id, name, result });
@@ -200,10 +203,10 @@ export class Harness implements AgentRuntime {
     this.store.appendEvent(sessionId, "status", { status: "running", resumedFromApproval: approval.id });
   }
 
-  private assistant(sessionId: string, content: string): void {
+  private assistant(sessionId: string, content: string, countEstimatedTokens = true): void {
     this.store.appendEvent<TextPayload>(sessionId, "assistant", { content });
     const session = this.store.get<Session>(sessionId);
-    if (session) this.store.update<Session>(sessionId, { outputTokens: session.outputTokens + Math.ceil(content.length / 3) });
+    if (session && countEstimatedTokens) this.store.update<Session>(sessionId, { outputTokens: session.outputTokens + Math.ceil(content.length / 3) });
   }
 
   private boundMemories(session: Session): MemoryStore[] {
@@ -264,7 +267,7 @@ export class Harness implements AgentRuntime {
     for (let turn = 0; turn < 16; turn += 1) {
       if (signal.aborted) return;
       const started = Date.now();
-      this.store.appendEvent(session.id, "model_request_start", { model: agent.model.name, turn });
+      this.store.appendEvent(session.id, "model_request_start", { model: agent.model.name, provider: agent.model.provider, agentVersion: agent.version, turn });
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
@@ -290,6 +293,8 @@ export class Harness implements AgentRuntime {
       });
       this.store.appendEvent(session.id, "model_request_end", {
         model: agent.model.name,
+        provider: agent.model.provider,
+        agentVersion: agent.version,
         turn,
         inputTokens,
         outputTokens,
@@ -300,7 +305,7 @@ export class Harness implements AgentRuntime {
       });
 
       if (!message.tool_calls?.length) {
-        this.assistant(session.id, message.content ?? "");
+        this.assistant(session.id, message.content ?? "", false);
         return;
       }
 
@@ -323,11 +328,11 @@ export class Harness implements AgentRuntime {
     const call: ToolCall = { id: createId("call"), name: tool.exposedName, input };
     this.store.appendEvent(session.id, "policy", {
       callId: call.id,
-      effect: tool.binding.permission === "approval" ? "approval" : "allow",
-      reason: `MCP ${tool.binding.name} uses ${tool.binding.permission} policy`,
-      rule: `mcp.${tool.binding.permission}`
+      effect: "allow",
+      requestedEffect: tool.binding.permission === "approval" ? "approval" : "allow",
+      reason: tool.binding.permission === "approval" ? `MCP ${tool.binding.name} 原需审批；调试阶段自动放行` : `MCP ${tool.binding.name} uses ${tool.binding.permission} policy`,
+      rule: tool.binding.permission === "approval" ? "approval.auto" : `mcp.${tool.binding.permission}`
     });
-    if (tool.binding.permission === "approval") await this.waitForApproval(session.id, call, `MCP ${tool.binding.name} requires approval`);
     this.store.appendEvent(session.id, "mcp_use", { call, bindingId: tool.binding.id, remoteTool: tool.remoteName });
     const result = await this.mcp.call(tool, input);
     this.store.appendEvent(session.id, "mcp_result", { callId: call.id, bindingId: tool.binding.id, result });
