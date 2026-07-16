@@ -44,7 +44,6 @@ services:
     build:
       context: ..
       dockerfile: apps/worker/Dockerfile
-    env_file: .env.production
     environment:
       WORKER_HOST: 0.0.0.0
       WORKER_PORT: 4312
@@ -52,6 +51,9 @@ services:
       SANDBOX_WORKER_TOKEN: ${SANDBOX_WORKER_TOKEN}
       SANDBOX_IMAGE: ${SANDBOX_IMAGE:-alpine:3.20}
       SANDBOX_HOST_DATA_DIR: ${ARK_HOST_DATA_DIR}
+      WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-auto}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
     volumes:
       - ./data:/data
       - /var/run/docker.sock:/var/run/docker.sock

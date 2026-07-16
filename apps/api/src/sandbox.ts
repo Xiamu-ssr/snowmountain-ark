@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import type { Environment, Session, ToolCall } from "@snowmountain/contracts";
+import { searchWeb } from "./web-search.js";
 
 const execFileAsync = promisify(execFile);
 const validSessionId = /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/;
@@ -95,7 +96,9 @@ export class Sandbox {
         return { status: response.status, content: text.slice(0, 50_000) };
       }
       case "web_search":
-        throw new Error("web_search requires a configured search provider");
+        return searchWeb(String(call.input.query ?? ""), {
+          ...(typeof call.input.max_results === "number" ? { maxResults: call.input.max_results } : {})
+        });
       default:
         throw new Error(`Unsupported tool: ${String(call.name)}`);
     }

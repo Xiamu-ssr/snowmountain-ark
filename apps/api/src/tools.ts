@@ -17,7 +17,7 @@ const builtinFunctions: BuiltinToolDefinition["function"][] = [
   { name: "glob", description: "列出工作区文件", parameters: { type: "object", properties: { pattern: { type: "string" } } } },
   { name: "grep", description: "搜索工作区文件内容", parameters: { type: "object", properties: { pattern: { type: "string" } }, required: ["pattern"] } },
   { name: "web_fetch", description: "读取策略允许的 URL", parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
-  { name: "web_search", description: "调用已配置的搜索服务", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }
+  { name: "web_search", description: "调用已配置的 Tavily / Firecrawl 搜索服务", parameters: { type: "object", properties: { query: { type: "string" }, max_results: { type: "integer", minimum: 1, maximum: 10 } }, required: ["query"] } }
 ];
 
 export const builtinToolDefinitions: BuiltinToolDefinition[] = builtinFunctions.map((item) => ({ type: "function", function: item }));
